@@ -15,6 +15,7 @@
     - Built-in Themes presets + theme file profiles (Library:AddThemeUI)
     - Emblem system + ESP Preview (bundles/dances) moved in: Library:CreateEmblem /
       Library:CreateEspPreview / Library:AddEmblemUI / Library:AddEspPreviewUI
+    - World Player ESP: Library:CreatePlayerEsp / Library:AddEspUI
     - Load via loadstring(HttpGet(...))() — keep returning Library at the end
 
     Documentation:
@@ -37,6 +38,8 @@
         Options: Parent, IsUnloaded, Name, DanceProxyName
     Library:AddEmblemUI(Page, Emblem, { DanceTarget = EspPreview? })
     Library:AddEspPreviewUI(Page, EspPreview)
+    Library:CreatePlayerEsp(Options?) -> PlayerEsp  -- real players (Drawing + Highlight)
+    Library:AddEspUI(Page, { Preview = EspPreview, World = PlayerEsp })
 
     function Window:Page(Data: table
         Name/name: string,
@@ -282,7 +285,7 @@ local Library do
         },
 
         -- Ignore below
-        Version = "haze-1.4",
+        Version = "haze-1.5",
         Pages = { },
         Sections = { },
         Connections = { },
@@ -3313,6 +3316,41 @@ local Library do
             Library:AfterFade(NewTween, function()
                 Debounce = false
                 Items["MainFrame"].Instance.Visible = Bool
+                if Bool then
+                    for _, Page in Window.Pages do
+                        if not Page.HasSubtabs then
+                            continue
+                        end
+                        for _, SubPage in Page.SubPages do
+                            local SubItems = SubPage.Elements
+                            local Icon = SubItems and SubItems["Icon"] and SubItems["Icon"].Instance
+                            local Hide = SubItems and SubItems["Hide"] and SubItems["Hide"].Instance
+                            local Inactive = SubItems and SubItems["Inactive"] and SubItems["Inactive"].Instance
+                            if not Icon then
+                                continue
+                            end
+                            if SubPage.Active then
+                                Icon.ImageTransparency = 0
+                                Icon.ImageColor3 = Library.Theme.Accent
+                                if Hide then
+                                    Hide.Visible = true
+                                end
+                                if Inactive thenA
+                                    Inactive.Size = UDim2New(1, 0, 1, 1)
+                                end
+                            else
+                                Icon.ImageTransparency = 0.35
+                                Icon.ImageColor3 = Library.Theme.Text
+                                if Hide then
+                                    Hide.Visible = false
+                                end
+                                if Inactive then
+                                    Inactive.Size = UDim2New(1, 0, 1, -2)
+                                end
+                            end
+                        end
+                    end
+                end
             end)
         end
 
@@ -3557,11 +3595,17 @@ local Library do
                 Library:CloseDropdowns()
             end
 
+            local SubTabsRoot = Items["SubTabs"] and Items["SubTabs"].Instance
             local Descendants = Items["Page"].Instance:GetDescendants()
             TableInsert(Descendants, Items["Page"].Instance)
 
             local NewTween
             for Index, Value in Descendants do 
+                -- Subtab icons use partial ImageTransparency; fading them washes to 1 permanently.
+                if SubTabsRoot and (Value == SubTabsRoot or Value:IsDescendantOf(SubTabsRoot)) then
+                    continue
+                end
+
                 local ValueIndex = Library:GetTransparencyPropertyFromItem(Value)
 
                 if not ValueIndex then 
@@ -3577,9 +3621,50 @@ local Library do
                 end
             end
 
+            local function RefreshSubTabIcons()
+                if not Page.HasSubtabs then
+                    return
+                end
+                for _, SubPage in Page.SubPages do
+                    local SubItems = SubPage.Elements
+                    local Icon = SubItems and SubItems["Icon"] and SubItems["Icon"].Instance
+                    local Hide = SubItems and SubItems["Hide"] and SubItems["Hide"].Instance
+                    local Inactive = SubItems and SubItems["Inactive"] and SubItems["Inactive"].Instance
+                    if not Icon then
+                        continue
+                    end
+                    if SubPage.Active then
+                        Icon.ImageTransparency = 0
+                        Icon.ImageColor3 = Library.Theme.Accent
+                        if Hide then
+                            Hide.Visible = true
+                        end
+                        if Inactive then
+                            Inactive.Size = UDim2New(1, 0, 1, 1)
+                        end
+                    else
+                        Icon.ImageTransparency = 0.35
+                        Icon.ImageColor3 = Library.Theme.Text
+                        if Hide then
+                            Hide.Visible = false
+                        end
+                        if Inactive then
+                            Inactive.Size = UDim2New(1, 0, 1, -2)
+                        end
+                    end
+                end
+            end
+
+            if Bool then
+                RefreshSubTabIcons()
+            end
+
             Library:AfterFade(NewTween, function()
                 Debounce = false
                 Items["Page"].Instance.Visible = Bool
+                if Bool then
+                    RefreshSubTabIcons()
+                end
             end)
         end
 
@@ -8708,34 +8793,616 @@ Library.AddEmblemUI = function(self, Page, Emblem, Data)
     end})
 end
 
-Library.AddEspPreviewUI = function(self, Page, EspPreview)
+Library.CreatePlayerEsp = function(self, Options)
+    Options = Options or {}
+
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = workspace.CurrentCamera
+    local DrawLib = nil
+    pcall(function()
+        DrawLib = Drawing
+    end)
+    if type(DrawLib) ~= "table" and getgenv then
+        DrawLib = getgenv().Drawing
+    end
+
+    local function IsUnloaded()
+        if type(Options.IsUnloaded) == "function" then
+            return Options.IsUnloaded()
+        end
+        return false
+    end
+
+    local PlayerEsp = {
+        Alive = true,
+        BoxEnabled = false,
+        NameEnabled = false,
+        HealthEnabled = false,
+        DistanceEnabled = false,
+        TracerEnabled = false,
+        SkeletonEnabled = false,
+        ChamsEnabled = false,
+        TeamCheck = false,
+        MaxDistance = 1000,
+        Color = Color3.fromRGB(125, 211, 252),
+        Entries = {},
+        Connection = nil,
+    }
+
+    local SkeletonPairs = {
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"RightUpperLeg", "RightLowerLeg"},
+        {"RightLowerLeg", "RightFoot"},
+        -- R6
+        {"Head", "Torso"},
+        {"Torso", "Left Arm"},
+        {"Torso", "Right Arm"},
+        {"Torso", "Left Leg"},
+        {"Torso", "Right Leg"},
+    }
+
+    local function HasDrawing()
+        return type(DrawLib) == "table" and type(DrawLib.new) == "function"
+    end
+
+    local function NewDrawing(Class, Props)
+        if not HasDrawing() then
+            return nil
+        end
+        local Obj = DrawLib.new(Class)
+        for Key, Value in Props or {} do
+            Obj[Key] = Value
+        end
+        return Obj
+    end
+
+    local function DestroyDrawing(Obj)
+        if Obj then
+            pcall(function()
+                Obj.Visible = false
+                Obj:Remove()
+            end)
+        end
+    end
+
+    local function HealthColor(Amount)
+        Amount = math.clamp(Amount, 0, 1)
+        return Color3.fromRGB(
+            math.floor(255 - 255 * Amount + 0.5),
+            math.floor(255 * Amount + 0.5),
+            0
+        )
+    end
+
+    local function HideEntry(Entry)
+        if not Entry then
+            return
+        end
+        for _, Obj in pairs(Entry.Drawings) do
+            if type(Obj) == "table" then
+                for _, Line in pairs(Obj) do
+                    if Line then
+                        Line.Visible = false
+                    end
+                end
+            elseif Obj then
+                Obj.Visible = false
+            end
+        end
+        if Entry.Chams and Entry.Chams.Parent then
+            Entry.Chams.Enabled = false
+        end
+    end
+
+    local function RemoveEntry(Player)
+        local Entry = PlayerEsp.Entries[Player]
+        if not Entry then
+            return
+        end
+        for _, Obj in pairs(Entry.Drawings) do
+            if type(Obj) == "table" then
+                for _, Line in pairs(Obj) do
+                    DestroyDrawing(Line)
+                end
+            else
+                DestroyDrawing(Obj)
+            end
+        end
+        if Entry.Chams then
+            pcall(function()
+                Entry.Chams:Destroy()
+            end)
+        end
+        PlayerEsp.Entries[Player] = nil
+    end
+
+    local function EnsureEntry(Player)
+        local Entry = PlayerEsp.Entries[Player]
+        if Entry then
+            return Entry
+        end
+
+        local SkeletonLines = {}
+        if HasDrawing() then
+            for Index = 1, #SkeletonPairs do
+                SkeletonLines[Index] = NewDrawing("Line", {
+                    Thickness = 1,
+                    Color = PlayerEsp.Color,
+                    Visible = false,
+                })
+            end
+        end
+
+        Entry = {
+            Drawings = {
+                BoxOutline = NewDrawing("Square", {
+                    Filled = false,
+                    Thickness = 3,
+                    Color = Color3.new(0, 0, 0),
+                    Visible = false,
+                }),
+                Box = NewDrawing("Square", {
+                    Filled = false,
+                    Thickness = 1,
+                    Color = PlayerEsp.Color,
+                    Visible = false,
+                }),
+                Name = NewDrawing("Text", {
+                    Center = true,
+                    Outline = true,
+                    Size = 13,
+                    Font = (DrawLib and DrawLib.Fonts and DrawLib.Fonts.Plex) or 2,
+                    Color = PlayerEsp.Color,
+                    Visible = false,
+                }),
+                Distance = NewDrawing("Text", {
+                    Center = true,
+                    Outline = true,
+                    Size = 12,
+                    Font = (DrawLib and DrawLib.Fonts and DrawLib.Fonts.Plex) or 2,
+                    Color = Color3.fromRGB(200, 200, 210),
+                    Visible = false,
+                }),
+                HealthOutline = NewDrawing("Square", {
+                    Filled = false,
+                    Thickness = 3,
+                    Color = Color3.new(0, 0, 0),
+                    Visible = false,
+                }),
+                Health = NewDrawing("Square", {
+                    Filled = true,
+                    Thickness = 1,
+                    Color = Color3.fromRGB(0, 255, 0),
+                    Visible = false,
+                }),
+                Tracer = NewDrawing("Line", {
+                    Thickness = 1,
+                    Color = PlayerEsp.Color,
+                    Visible = false,
+                }),
+                Skeleton = SkeletonLines,
+            },
+            Chams = nil,
+        }
+
+        PlayerEsp.Entries[Player] = Entry
+        return Entry
+    end
+
+    local function EnsureChams(Entry, Character)
+        if not PlayerEsp.ChamsEnabled then
+            if Entry.Chams then
+                Entry.Chams.Enabled = false
+            end
+            return
+        end
+
+        if not Entry.Chams or not Entry.Chams.Parent then
+            local Highlight = Instance.new("Highlight")
+            Highlight.Name = "haze_player_esp_chams"
+            Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            Highlight.FillTransparency = 0.55
+            Highlight.OutlineTransparency = 0
+            Highlight.Parent = Character
+            Entry.Chams = Highlight
+        end
+
+        Entry.Chams.Adornee = Character
+        Entry.Chams.Parent = Character
+        Entry.Chams.Enabled = true
+        Entry.Chams.FillColor = PlayerEsp.Color
+        Entry.Chams.OutlineColor = PlayerEsp.Color
+    end
+
+    local function GetRoot(Character)
+        return Character:FindFirstChild("HumanoidRootPart")
+            or Character:FindFirstChild("Torso")
+            or Character:FindFirstChild("UpperTorso")
+    end
+
+    local function WorldToScreen(Position)
+        local Screen, OnScreen = Camera:WorldToViewportPoint(Position)
+        return Vector2.new(Screen.X, Screen.Y), OnScreen, Screen.Z
+    end
+
+    local function GetCharacterBounds(Character)
+        local Parts = {}
+        for _, Part in Character:GetChildren() do
+            if Part:IsA("BasePart") and Part.Name ~= "HumanoidRootPart" then
+                table.insert(Parts, Part)
+            end
+        end
+        if #Parts == 0 then
+            return nil
+        end
+
+        local MinX, MinY = math.huge, math.huge
+        local MaxX, MaxY = -math.huge, -math.huge
+        local AnyOnScreen = false
+        local Behind = false
+
+        for _, Part in Parts do
+            local Size = Part.Size * 0.5
+            local Cf = Part.CFrame
+            for _, Ox in {-1, 1} do
+                for _, Oy in {-1, 1} do
+                    for _, Oz in {-1, 1} do
+                        local World = Cf:PointToWorldSpace(Vector3.new(Size.X * Ox, Size.Y * Oy, Size.Z * Oz))
+                        local Screen, OnScreen, Depth = WorldToScreen(World)
+                        if Depth < 0 then
+                            Behind = true
+                        elseif OnScreen or (Screen.X > -200 and Screen.X < Camera.ViewportSize.X + 200) then
+                            AnyOnScreen = AnyOnScreen or OnScreen
+                            MinX = math.min(MinX, Screen.X)
+                            MinY = math.min(MinY, Screen.Y)
+                            MaxX = math.max(MaxX, Screen.X)
+                            MaxY = math.max(MaxY, Screen.Y)
+                        end
+                    end
+                end
+            end
+        end
+
+        if MinX == math.huge or Behind then
+            return nil
+        end
+
+        return {
+            X = MinX,
+            Y = MinY,
+            W = math.max(2, MaxX - MinX),
+            H = math.max(2, MaxY - MinY),
+            OnScreen = AnyOnScreen,
+        }
+    end
+
+    local function SameTeam(Player)
+        if not PlayerEsp.TeamCheck then
+            return false
+        end
+        if not LocalPlayer or not Player then
+            return false
+        end
+        if LocalPlayer.Team and Player.Team then
+            return LocalPlayer.Team == Player.Team
+        end
+        return LocalPlayer.TeamColor == Player.TeamColor
+    end
+
+    local function UpdatePlayer(Player)
+        if not PlayerEsp.Alive or IsUnloaded() or Player == LocalPlayer then
+            return
+        end
+
+        local Character = Player.Character
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+        local Root = Character and GetRoot(Character)
+        local Entry = EnsureEntry(Player)
+
+        if not Character or not Humanoid or Humanoid.Health <= 0 or not Root then
+            HideEntry(Entry)
+            return
+        end
+
+        if SameTeam(Player) then
+            HideEntry(Entry)
+            return
+        end
+
+        local LocalRoot = LocalPlayer.Character and GetRoot(LocalPlayer.Character)
+        local Distance = LocalRoot and (Root.Position - LocalRoot.Position).Magnitude or 0
+        if Distance > PlayerEsp.MaxDistance then
+            HideEntry(Entry)
+            return
+        end
+
+        local Bounds = GetCharacterBounds(Character)
+        if not Bounds then
+            HideEntry(Entry)
+            return
+        end
+
+        local Color = PlayerEsp.Color
+        local HealthFrac = math.clamp(Humanoid.Health / math.max(Humanoid.MaxHealth, 1), 0, 1)
+        local Drawings = Entry.Drawings
+
+        if PlayerEsp.BoxEnabled and Drawings.Box then
+            Drawings.BoxOutline.Size = Vector2.new(Bounds.W, Bounds.H)
+            Drawings.BoxOutline.Position = Vector2.new(Bounds.X, Bounds.Y)
+            Drawings.BoxOutline.Visible = true
+
+            Drawings.Box.Size = Vector2.new(Bounds.W, Bounds.H)
+            Drawings.Box.Position = Vector2.new(Bounds.X, Bounds.Y)
+            Drawings.Box.Color = Color
+            Drawings.Box.Visible = true
+        else
+            if Drawings.Box then
+                Drawings.Box.Visible = false
+                Drawings.BoxOutline.Visible = false
+            end
+        end
+
+        if PlayerEsp.NameEnabled and Drawings.Name then
+            Drawings.Name.Text = Player.DisplayName ~= Player.Name
+                and (Player.DisplayName .. " (" .. Player.Name .. ")")
+                or Player.Name
+            Drawings.Name.Position = Vector2.new(Bounds.X + Bounds.W * 0.5, Bounds.Y - 16)
+            Drawings.Name.Color = Color
+            Drawings.Name.Visible = true
+        elseif Drawings.Name then
+            Drawings.Name.Visible = false
+        end
+
+        if PlayerEsp.DistanceEnabled and Drawings.Distance then
+            Drawings.Distance.Text = string.format("%dm", math.floor(Distance + 0.5))
+            Drawings.Distance.Position = Vector2.new(Bounds.X + Bounds.W * 0.5, Bounds.Y + Bounds.H + 2)
+            Drawings.Distance.Visible = true
+        elseif Drawings.Distance then
+            Drawings.Distance.Visible = false
+        end
+
+        if PlayerEsp.HealthEnabled and Drawings.Health then
+            local BarX = Bounds.X - 6
+            local BarH = Bounds.H
+            local FillH = math.max(1, BarH * HealthFrac)
+            Drawings.HealthOutline.Size = Vector2.new(3, BarH)
+            Drawings.HealthOutline.Position = Vector2.new(BarX - 1, Bounds.Y)
+            Drawings.HealthOutline.Visible = true
+            Drawings.Health.Size = Vector2.new(2, FillH)
+            Drawings.Health.Position = Vector2.new(BarX, Bounds.Y + (BarH - FillH))
+            Drawings.Health.Color = HealthColor(HealthFrac)
+            Drawings.Health.Visible = true
+        elseif Drawings.Health then
+            Drawings.Health.Visible = false
+            Drawings.HealthOutline.Visible = false
+        end
+
+        if PlayerEsp.TracerEnabled and Drawings.Tracer then
+            local From = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y)
+            local To = Vector2.new(Bounds.X + Bounds.W * 0.5, Bounds.Y + Bounds.H)
+            Drawings.Tracer.From = From
+            Drawings.Tracer.To = To
+            Drawings.Tracer.Color = Color
+            Drawings.Tracer.Visible = true
+        elseif Drawings.Tracer then
+            Drawings.Tracer.Visible = false
+        end
+
+        if PlayerEsp.SkeletonEnabled and Drawings.Skeleton then
+            for Index, Pair in ipairs(SkeletonPairs) do
+                local Line = Drawings.Skeleton[Index]
+                local A = Character:FindFirstChild(Pair[1])
+                local B = Character:FindFirstChild(Pair[2])
+                if Line and A and B and A:IsA("BasePart") and B:IsA("BasePart") then
+                    local SA, OA = WorldToScreen(A.Position)
+                    local SB, OB = WorldToScreen(B.Position)
+                    if OA and OB then
+                        Line.From = SA
+                        Line.To = SB
+                        Line.Color = Color
+                        Line.Visible = true
+                    else
+                        Line.Visible = false
+                    end
+                elseif Line then
+                    Line.Visible = false
+                end
+            end
+        elseif Drawings.Skeleton then
+            for _, Line in Drawings.Skeleton do
+                if Line then
+                    Line.Visible = false
+                end
+            end
+        end
+
+        EnsureChams(Entry, Character)
+    end
+
+    local function RefreshAll()
+        if not PlayerEsp.Alive or IsUnloaded() then
+            return
+        end
+        Camera = workspace.CurrentCamera
+        for _, Player in Players:GetPlayers() do
+            UpdatePlayer(Player)
+        end
+    end
+
+    PlayerEsp.SetBoxEnabled = function(_, Value)
+        PlayerEsp.BoxEnabled = Value and true or false
+    end
+    PlayerEsp.SetNameEnabled = function(_, Value)
+        PlayerEsp.NameEnabled = Value and true or false
+    end
+    PlayerEsp.SetHealthEnabled = function(_, Value)
+        PlayerEsp.HealthEnabled = Value and true or false
+    end
+    PlayerEsp.SetDistanceEnabled = function(_, Value)
+        PlayerEsp.DistanceEnabled = Value and true or false
+    end
+    PlayerEsp.SetTracerEnabled = function(_, Value)
+        PlayerEsp.TracerEnabled = Value and true or false
+    end
+    PlayerEsp.SetSkeletonEnabled = function(_, Value)
+        PlayerEsp.SkeletonEnabled = Value and true or false
+    end
+    PlayerEsp.SetChamsEnabled = function(_, Value)
+        PlayerEsp.ChamsEnabled = Value and true or false
+        if not PlayerEsp.ChamsEnabled then
+            for _, Entry in pairs(PlayerEsp.Entries) do
+                if Entry.Chams then
+                    Entry.Chams.Enabled = false
+                end
+            end
+        end
+    end
+    PlayerEsp.SetTeamCheck = function(_, Value)
+        PlayerEsp.TeamCheck = Value and true or false
+    end
+    PlayerEsp.SetMaxDistance = function(_, Value)
+        PlayerEsp.MaxDistance = math.max(50, tonumber(Value) or 1000)
+    end
+    PlayerEsp.SetColor = function(_, Color)
+        if typeof(Color) == "Color3" then
+            PlayerEsp.Color = Color
+        end
+    end
+
+    PlayerEsp.Destroy = function(_)
+        PlayerEsp.Alive = false
+        if PlayerEsp.Connection then
+            PlayerEsp.Connection:Disconnect()
+            PlayerEsp.Connection = nil
+        end
+        for Player in pairs(PlayerEsp.Entries) do
+            RemoveEntry(Player)
+        end
+        if Library.PlayerEsp == PlayerEsp then
+            Library.PlayerEsp = nil
+        end
+    end
+
+    Players.PlayerRemoving:Connect(function(Player)
+        RemoveEntry(Player)
+    end)
+
+    PlayerEsp.Connection = RunService.RenderStepped:Connect(RefreshAll)
+    Library.PlayerEsp = PlayerEsp
+
+    if not HasDrawing() then
+        warn("[haze] Drawing library missing — box/name/health/tracer/skeleton need Drawing; chams still work")
+    end
+
+    return PlayerEsp
+end
+
+Library.AddEspUI = function(self, Page, Data)
+    Data = Data or {}
+    local EspPreview = Data.Preview or Data.EspPreview
+    local World = Data.World or Data.PlayerEsp
+
     local EspSection = Page:Section({Name = "ESP", Side = 1})
+    local OptionsSection = Page:Section({Name = "Options", Side = 1})
     local PreviewSection = Page:Section({Name = "Preview", Side = 2})
 
+    local function Sync(SetterPreview, SetterWorld, Value)
+        if SetterPreview then
+            SetterPreview(EspPreview, Value)
+        end
+        if SetterWorld then
+            SetterWorld(World, Value)
+        end
+    end
+
     EspSection:Toggle({Name = "Box", Flag = "ESP Box", Default = false, Callback = function(Value)
-        EspPreview:SetBoxEnabled(Value)
+        Sync(EspPreview and EspPreview.SetBoxEnabled, World and World.SetBoxEnabled, Value)
     end})
 
     EspSection:Toggle({Name = "Name", Flag = "ESP Name", Default = false, Callback = function(Value)
-        EspPreview:SetNameEnabled(Value)
+        Sync(EspPreview and EspPreview.SetNameEnabled, World and World.SetNameEnabled, Value)
     end})
 
     EspSection:Toggle({Name = "Health bar", Flag = "ESP Health", Default = false, Callback = function(Value)
-        EspPreview:SetHealthEnabled(Value)
+        Sync(EspPreview and EspPreview.SetHealthEnabled, World and World.SetHealthEnabled, Value)
+    end})
+
+    EspSection:Toggle({Name = "Distance", Flag = "ESP Distance", Default = false, Callback = function(Value)
+        if World then
+            World:SetDistanceEnabled(Value)
+        end
+    end})
+
+    EspSection:Toggle({Name = "Tracer", Flag = "ESP Tracer", Default = false, Callback = function(Value)
+        if World then
+            World:SetTracerEnabled(Value)
+        end
+    end})
+
+    EspSection:Toggle({Name = "Skeleton", Flag = "ESP Skeleton", Default = false, Callback = function(Value)
+        if World then
+            World:SetSkeletonEnabled(Value)
+        end
     end})
 
     EspSection:Toggle({Name = "Chams", Flag = "ESP Chams", Default = false, Callback = function(Value)
-        EspPreview:SetChamsEnabled(Value)
+        Sync(EspPreview and EspPreview.SetChamsEnabled, World and World.SetChamsEnabled, Value)
     end})
 
-    PreviewSection:Label({Name = "Color", Alignment = "Left"}):Colorpicker({
+    OptionsSection:Toggle({Name = "Team Check", Flag = "ESP Team Check", Default = false, Callback = function(Value)
+        if World then
+            World:SetTeamCheck(Value)
+        end
+    end})
+
+    OptionsSection:Slider({
+        Name = "Max Distance",
+        Min = 50,
+        Max = 5000,
+        Default = 1000,
+        Decimals = 1,
+        Flag = "ESP Max Distance",
+        Callback = function(Value)
+            if World then
+                World:SetMaxDistance(Value)
+            end
+        end
+    })
+
+    OptionsSection:Label({Name = "Color", Alignment = "Left"}):Colorpicker({
         Name = "ESP Color",
         Default = Color3.fromRGB(125, 211, 252),
         Flag = "ESP Color",
         Callback = function(Color)
-            EspPreview:SetColor(Color)
+            if EspPreview then
+                EspPreview:SetColor(Color)
+            end
+            if World then
+                World:SetColor(Color)
+            end
         end
     })
+
+    if EspPreview then
+        PreviewSection:Label({Name = "Preview mirrors Box / Name / Health / Chams", Alignment = "Left"})
+    end
+end
+
+Library.AddEspPreviewUI = function(self, Page, EspPreview)
+    self:AddEspUI(Page, { Preview = EspPreview, World = self.PlayerEsp })
 end
 
 Library.Init = function(self)
