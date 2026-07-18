@@ -5,9 +5,13 @@
     Assign different flags to each element to prevent from configs overriding eachother
     Example script is at the bottom
 
-    Fork notes:
+    Fork notes (haze-1.2):
     - Dropdowns support MaxSize + native scroll (long lists)
-    - Opening a dropdown closes other open dropdowns
+    - Opening a dropdown closes other open dropdowns (Library:CloseDropdowns)
+    - Toggle:Set(false) / config load fixed; Colorpicker table alpha fixed
+    - SaveConfig path fixed; Init/LoadConfig hardened
+    - Fade completion nil-safe (Library:AfterFade); close allowed while animating
+    - Subtabs scoped per Page; lighter subtab fade
     - Load via loadstring(HttpGet(...))() — keep returning Library at the end
 
     Documentation:
@@ -90,6 +94,9 @@
         MaxSize/maxsize: number, -- max open list height (px), default 168; scrolls when longer
         Callback/callback: function
     )
+    Dropdown:SetMaxSize(n)
+    Library:CloseDropdowns(Except?)
+    Library:AfterFade(tween, callback)
 
     function Section:Listbox(Data: table
         Size/size: number,
@@ -240,7 +247,7 @@ local Library do
         },
 
         -- Ignore below
-        Version = "haze-1.1",
+        Version = "haze-1.2",
         Pages = { },
         Sections = { },
         Connections = { },
@@ -844,7 +851,11 @@ local Library do
             [Property] = Visibility and OldTransparency or 1
         }, true)
 
-        Library:Connect(NewTween.Tween.Completed, function()
+        local Connection
+        Connection = NewTween.Tween.Completed:Connect(function()
+            if Connection then
+                Connection:Disconnect()
+            end
             if not Visibility then 
                 task.wait()
                 Item[Property] = OldTransparency
@@ -852,6 +863,28 @@ local Library do
         end)
 
         return NewTween
+    end
+
+    Library.AfterFade = function(self, NewTween, Callback)
+        if NewTween and NewTween.Tween then
+            local Connection
+            Connection = NewTween.Tween.Completed:Connect(function()
+                if Connection then
+                    Connection:Disconnect()
+                end
+                Callback()
+            end)
+        else
+            Callback()
+        end
+    end
+
+    Library.CloseDropdowns = function(self, Except)
+        for _, Dropdown in self.Dropdowns do
+            if Dropdown ~= Except and Dropdown.IsOpen then
+                Dropdown:SetOpen(false)
+            end
+        end
     end
 
     Library.Unload = function(self)
@@ -867,7 +900,7 @@ local Library do
             self.Holder:Clean()
         end
 
-        table.clear(self.Dropdowns)
+        self.Dropdowns = { }
 
         Library = nil 
         getgenv().Library = nil
@@ -967,9 +1000,16 @@ local Library do
     end
 
     Library.LoadConfig = function(self, Config)
-        local Decoded = HttpService:JSONDecode(Config)
+        local DecodeOk, Decoded = pcall(function()
+            return HttpService:JSONDecode(Config)
+        end)
 
-        local Success, Result = Library:SafeCall(function()
+        if not DecodeOk or type(Decoded) ~= "table" then
+            Library:Notification("Failed to load config", 5, Color3.fromRGB(255, 0, 0))
+            return false
+        end
+
+        local Success = Library:SafeCall(function()
             for Index, Value in Decoded do 
                 local SetFunction = Library.SetFlags[Index]
 
@@ -989,7 +1029,11 @@ local Library do
 
         if Success then 
             Library:Notification("Successfully loaded config", 5, Color3.fromRGB(0, 255, 0))
+            return true
         end
+
+        Library:Notification("Failed to apply config", 5, Color3.fromRGB(255, 0, 0))
+        return false
     end
 
     Library.DeleteConfig = function(self, Config)
@@ -1000,36 +1044,25 @@ local Library do
     end
 
     Library.SaveConfig = function(self, Config)
-        if isfile(Library.Folders.Directory .. "/" .. Library.Folders.Configs .. "/" .. Config .. ".json") then
-            writefile(Library.Folders.Directory .. "/" .. Library.Folders.Configs .. "/" .. Config .. ".json", Library:GetConfig())
+        local Path = Library.Folders.Configs .. "/" .. Config .. ".json"
+        if isfile(Path) then
+            writefile(Path, Library:GetConfig())
             Library:Notification("Saved config " .. Config .. ".json", 5, Color3.fromRGB(0, 255, 0))
         end
     end
 
     Library.RefreshConfigsList = function(self, Element)
-        local CurrentList = { }
         local List = { }
 
         local ConfigFolderName = StringGSub(Library.Folders.Configs, Library.Folders.Directory .. "/", "")
 
         for Index, Value in listfiles(Library.Folders.Configs) do
             local FileName = StringGSub(Value, Library.Folders.Directory .. "\\" .. ConfigFolderName .. "\\", "")
+            FileName = StringGSub(FileName, Library.Folders.Directory .. "/" .. ConfigFolderName .. "/", "")
             List[Index] = FileName
         end
 
-        local IsNew = #List ~= CurrentList
-
-        if not IsNew then
-            for Index = 1, #List do
-                if List[Index] ~= CurrentList[Index] then
-                    IsNew = true
-                    break
-                end
-            end
-        else
-            CurrentList = List
-            Element:Refresh(CurrentList)
-        end
+        Element:Refresh(List)
     end
 
     Library.ChangeItemTheme = function(self, Item, Properties)
@@ -1793,8 +1826,15 @@ local Library do
 
         function Colorpicker:Set(Color, Alpha)
             if type(Color) == "table" then 
-                Color = FromRGB(Color[1], Color[2], Color[3])
-                Alpha = Color[4]
+                local TableAlpha = Color.Alpha or Color[4]
+                if type(Color[1]) == "number" then
+                    Color = FromRGB(Color[1], Color[2], Color[3])
+                elseif type(Color.Color) == "string" then
+                    Color = FromHex(Color.Color)
+                elseif typeof(Color.Color) == "Color3" then
+                    Color = Color.Color
+                end
+                Alpha = TableAlpha or Alpha
             elseif type(Color) == "string" then 
                 Color = FromHex(Color)
             end
@@ -2632,7 +2672,7 @@ local Library do
         local Debounce = false
 
         function Window:SetOpen(Bool)
-            if Debounce then 
+            if Debounce and Bool then 
                 return 
             end
 
@@ -2642,6 +2682,8 @@ local Library do
 
             if Bool then 
                 Items["MainFrame"].Instance.Visible = true
+            else
+                Library:CloseDropdowns()
             end
 
             local Descendants = Items["MainFrame"].Instance:GetDescendants()
@@ -2664,7 +2706,7 @@ local Library do
                 end
             end
 
-            Library:Connect(NewTween.Tween.Completed, function()
+            Library:AfterFade(NewTween, function()
                 Debounce = false
                 Items["MainFrame"].Instance.Visible = Bool
             end)
@@ -2700,7 +2742,8 @@ local Library do
 
             Active = false,
             ColumnsData = { },
-            Elements = { }
+            Elements = { },
+            SubPages = { },
         }
 
         local Items = { } do 
@@ -2880,7 +2923,7 @@ local Library do
         local Debounce = false
 
         function Page:Turn(Bool)
-            if Debounce then 
+            if Debounce and Bool then 
                 return 
             end
 
@@ -2900,6 +2943,7 @@ local Library do
                 Items["Hide"].Instance.Visible = false
 
                 Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
+                Library:CloseDropdowns()
             end
 
             local Descendants = Items["Page"].Instance:GetDescendants()
@@ -2922,7 +2966,7 @@ local Library do
                 end
             end
 
-            Library:Connect(NewTween.Tween.Completed, function()
+            Library:AfterFade(NewTween, function()
                 Debounce = false
                 Items["Page"].Instance.Visible = Bool
             end)
@@ -3108,7 +3152,7 @@ local Library do
         local Debounce = false
 
         function SubPage:Turn(Bool)
-            if Debounce then 
+            if Debounce and Bool then 
                 return 
             end
 
@@ -3133,44 +3177,31 @@ local Library do
                 Items["Inactive"].Instance.Size = UDim2New(1, 0, 1, -2)
             end
 
-            local Descendants = Items["Subtab"].Instance:GetDescendants()
-            TableInsert(Descendants, Items["Subtab"].Instance)
-
-            local NewTween
-            for Index, Value in Descendants do 
-                local ValueIndex = Library:GetTransparencyPropertyFromItem(Value)
-
-                if not ValueIndex then 
-                    continue
-                end
-
-                if type(ValueIndex) == "table" then
-                    for _, Property in ValueIndex do 
-                        NewTween = Library:FadeItem(Value, Property, Bool, SubPage.Window.FadeSpeed or 0.5)
-                    end
-                else
-                    NewTween = Library:FadeItem(Value, ValueIndex, Bool, SubPage.Window.FadeSpeed or 0.5)
-                end
-            end
-
-            Library:Connect(NewTween.Tween.Completed, function()
+            -- show/hide only (full descendant fades were washing nested transparencies)
+            Items["Subtab"].Instance.Visible = Bool
+            task.delay(SubPage.Window.FadeSpeed or 0.25, function()
                 Debounce = false
                 Items["Subtab"].Instance.Visible = Bool
             end)
         end
 
         Items["Inactive"]:Connect("MouseButton1Down", function()
-            for Index, Value in SubPage.Window.SubPages do
+            local Group = SubPage.Page.SubPages
+            if not Group or #Group == 0 then
+                Group = SubPage.Window.SubPages
+            end
+            for Index, Value in Group do
                 Value:Turn(Value == SubPage)
             end
         end)
 
-        if #SubPage.Window.SubPages == 0 then 
+        if #SubPage.Page.SubPages == 0 then 
             SubPage:Turn(true)
         end
 
         SubPage.Elements = Items
 
+        TableInsert(SubPage.Page.SubPages, SubPage)
         TableInsert(SubPage.Window.SubPages, SubPage)
         return setmetatable(SubPage, Library.Pages)
     end
@@ -3820,7 +3851,11 @@ local Library do
         end
 
         function Toggle:Set(Bool)
-            Toggle.Value = Bool or not Toggle.Value
+            if Bool == nil then
+                Toggle.Value = not Toggle.Value
+            else
+                Toggle.Value = Bool and true or false
+            end
 
             Library.Flags[Toggle.Flag] = Toggle.Value
 
@@ -3843,6 +3878,10 @@ local Library do
 
         function Toggle:SetVisiblity(Bool)
             Items["Toggle"].Instance.Visible = Bool
+        end
+
+        function Toggle:SetVisibility(Bool)
+            Toggle:SetVisiblity(Bool)
         end
 
         function Toggle:Colorpicker(Data)
@@ -3899,7 +3938,7 @@ local Library do
             Toggle:Set()
         end)
 
-        if Toggle.Default then 
+        if Toggle.Default ~= nil then 
             Toggle:Set(Toggle.Default)
         end
 
@@ -4613,17 +4652,19 @@ local Library do
 
         local Debounce = false
 
+        function Dropdown:SetMaxSize(Size)
+            Dropdown.MaxSize = math.max(30, tonumber(Size) or Dropdown.MaxSize)
+            RefreshDropdownHeight()
+        end
+
         function Dropdown:SetOpen(Bool)
-            if Debounce then 
+            -- allow close while animating; only block stacked opens
+            if Debounce and Bool then 
                 return 
             end
 
             if Bool then
-                for _, Other in Library.Dropdowns do
-                    if Other ~= Dropdown and Other.IsOpen then
-                        Other:SetOpen(false)
-                    end
-                end
+                Library:CloseDropdowns(Dropdown)
             end
 
             Dropdown.IsOpen = Bool
@@ -4666,7 +4707,7 @@ local Library do
                 end
             end
 
-            Library:Connect(NewTween.Tween.Completed, function()
+            Library:AfterFade(NewTween, function()
                 Debounce = false
                 Items["OptionHolder"].Instance.Visible = Bool
                 Items["OptionHolder"].Instance.ZIndex = Bool and 15 or 1
@@ -5295,7 +5336,7 @@ local Library do
         
                     Library:RefreshConfigsList(ConfigsListbox)
                 else
-                    Library:Notification("Config '" .. ConfigName .. ".json' already exists", 3, Color3.FromR(255, 0, 0))
+                    Library:Notification("Config '" .. ConfigName .. ".json' already exists", 3, Color3.fromRGB(255, 0, 0))
                     return
                 end
             end})
@@ -5308,8 +5349,11 @@ local Library do
                     task.wait(0.1)
         
                     for Index, Value in Library.Theme do 
-                        Library.Theme[Index] = Library.Flags["Theme"..Index].Color
-                        Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
+                        local ThemeFlag = Library.Flags["Theme"..Index]
+                        if ThemeFlag and ThemeFlag.Color then
+                            Library.Theme[Index] = ThemeFlag.Color
+                            Library:ChangeTheme(Index, ThemeFlag.Color)
+                        end
                     end    
             end})
         
@@ -5347,10 +5391,14 @@ local Library do
         end
 
         Library.Init = function(self)
-            local IsAutoload = readfile(Library.Folders.Directory .. "/autoload.json")
+            local Path = Library.Folders.Directory .. "/autoload.json"
+            if not isfile(Path) then
+                return
+            end
 
-            if IsAutoload ~= "" then
-                Library:LoadConfig(IsAutoload)
+            local Ok, Content = pcall(readfile, Path)
+            if Ok and type(Content) == "string" and Content ~= "" then
+                Library:LoadConfig(Content)
             end
         end
     end
