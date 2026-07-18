@@ -17,8 +17,10 @@
     Documentation:
     function Library:Window(Data: table
         Name/name: string,
+        GameName/gamename: string, -- right side of title bar
         Size/size: UDim2
     )
+    Window:SetGameName(name)
 
     function Window:Page(Data: table
         Name/name: string,
@@ -2472,6 +2474,7 @@ local Library do
 
         local Window = {
             Name = Data.Name or Data.name or "Window",
+            GameName = Data.GameName or Data.gamename or Data.SubTitle or Data.subtitle or "",
             Size = Data.Size or Data.size or UDim2New(0, 500, 0, 600),
 
             FadeSpeed = Data.FadeSpeed or Data.fadespeed or 0.25,
@@ -2522,9 +2525,10 @@ local Library do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = Window.Name,
                 Name = "\0",
-                Size = UDim2New(1, 0, 0, 15),
+                Size = UDim2New(0.5, -10, 0, 15),
                 BackgroundTransparency = 1,
                 TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
                 Position = UDim2New(0, 6, 0, 1),
                 BorderSizePixel = 0,
                 TextSize = 12,
@@ -2533,6 +2537,30 @@ local Library do
 
             Instances:Create("UIStroke", {
                 Parent = Items["Title"].Instance,
+                LineJoinMode = Enum.LineJoinMode.Miter,
+                Name = "\0"
+            }):AddToTheme({Color = "Text Border"})
+
+            Items["GameName"] = Instances:Create("TextLabel", {
+                Parent = Items["MainFrame"].Instance,
+                FontFace = Library.Font,
+                TextColor3 = FromRGB(215, 215, 215),
+                BorderColor3 = FromRGB(0, 0, 0),
+                Text = Window.GameName or "",
+                Name = "\0",
+                AnchorPoint = Vector2New(1, 0),
+                Size = UDim2New(0.5, -10, 0, 15),
+                BackgroundTransparency = 1,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                Position = UDim2New(1, -6, 0, 1),
+                BorderSizePixel = 0,
+                TextSize = 12,
+                BackgroundColor3 = FromRGB(255, 255, 255)
+            })  Items["GameName"]:AddToTheme({TextColor3 = "Text"})
+
+            Instances:Create("UIStroke", {
+                Parent = Items["GameName"].Instance,
                 LineJoinMode = Enum.LineJoinMode.Miter,
                 Name = "\0"
             }):AddToTheme({Color = "Text Border"})
@@ -2722,6 +2750,13 @@ local Library do
             Items["FloatingButton"]:Connect("MouseButton1Down", function()
                 Window:SetOpen(not Window.IsOpen)
             end)
+        end
+
+        function Window:SetGameName(Name)
+            Window.GameName = tostring(Name or "")
+            if Items["GameName"] and Items["GameName"].Instance then
+                Items["GameName"].Instance.Text = Window.GameName
+            end
         end
 
         Window.Elements = Items
