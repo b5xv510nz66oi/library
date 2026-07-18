@@ -5,13 +5,14 @@
     Assign different flags to each element to prevent from configs overriding eachother
     Example script is at the bottom
 
-    Fork notes (haze-1.2):
+    Fork notes (haze-1.3):
     - Dropdowns support MaxSize + native scroll (long lists)
     - Opening a dropdown closes other open dropdowns (Library:CloseDropdowns)
     - Toggle:Set(false) / config load fixed; Colorpicker table alpha fixed
     - SaveConfig path fixed; Init/LoadConfig hardened
     - Fade completion nil-safe (Library:AfterFade); close allowed while animating
     - Subtabs scoped per Page; lighter subtab fade
+    - Built-in Themes presets + theme file profiles (Library:AddThemeUI)
     - Load via loadstring(HttpGet(...))() — keep returning Library at the end
 
     Documentation:
@@ -21,6 +22,11 @@
         Size/size: UDim2
     )
     Window:SetGameName(name)
+
+    Themes:
+    Library.Themes / Library:ApplyTheme(name) / Library:AddThemeUI(page, {Default=...})
+    Library:CreateThemeFile / LoadThemeFile / SaveThemeFile / DeleteThemeFile / SetThemeAutoload
+    Library:AddThemeHook(callback) — fires when theme colors change
 
     function Window:Page(Data: table
         Name/name: string,
@@ -236,8 +242,25 @@ local Library do
         Folders = {
             Directory = "scriptname",
             Configs = "scriptname/Configs",
-            Assets = "scriptname/Assets"
+            Assets = "scriptname/Assets",
+            Themes = "scriptname/Themes",
         },
+
+        ThemeKeys = {
+            "Background",
+            "Inline",
+            "Page Background",
+            "Border",
+            "Outline",
+            "Accent",
+            "Element",
+            "Hovered Element",
+            "Text",
+            "Text Border",
+        },
+
+        Themes = { },
+        ThemeHooks = { },
 
         Images = { -- you're welcome to reupload the images and replace it with your own links
             ["Saturation"] = {"Saturation.png", "https://github.com/sametexe001/images/blob/main/saturation.png?raw=true" },
@@ -249,7 +272,7 @@ local Library do
         },
 
         -- Ignore below
-        Version = "haze-1.2",
+        Version = "haze-1.3",
         Pages = { },
         Sections = { },
         Connections = { },
@@ -1087,6 +1110,549 @@ local Library do
                     Item.Item[Property] = Color
                 end
             end
+        end
+    end
+
+    -- Theme presets + file profiles (used by AddThemeUI / ApplyTheme)
+    do
+        local function ThemeHex(Hex)
+            return FromHex((tostring(Hex or "000000")):gsub("#", ""))
+        end
+
+        Library.Themes = {
+            ["Dark"] = {
+                ["Background"] = ThemeHex("#0a0a0a"),
+                ["Inline"] = ThemeHex("#111111"),
+                ["Page Background"] = ThemeHex("#1a1a1a"),
+                ["Border"] = ThemeHex("#050505"),
+                ["Outline"] = ThemeHex("#1f1f1f"),
+                ["Accent"] = ThemeHex("#ffffff"),
+                ["Element"] = ThemeHex("#161616"),
+                ["Hovered Element"] = ThemeHex("#222222"),
+                ["Text"] = ThemeHex("#c8c8c8"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Blue"] = {
+                ["Background"] = ThemeHex("#0d1117"),
+                ["Inline"] = ThemeHex("#121820"),
+                ["Page Background"] = ThemeHex("#1b2430"),
+                ["Border"] = ThemeHex("#0a0e14"),
+                ["Outline"] = ThemeHex("#1e2836"),
+                ["Accent"] = ThemeHex("#58a6ff"),
+                ["Element"] = ThemeHex("#161b22"),
+                ["Hovered Element"] = ThemeHex("#21262d"),
+                ["Text"] = ThemeHex("#a9b4c0"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Green"] = {
+                ["Background"] = ThemeHex("#0c1210"),
+                ["Inline"] = ThemeHex("#111816"),
+                ["Page Background"] = ThemeHex("#1a2620"),
+                ["Border"] = ThemeHex("#090e0c"),
+                ["Outline"] = ThemeHex("#1c2922"),
+                ["Accent"] = ThemeHex("#7ee787"),
+                ["Element"] = ThemeHex("#15201b"),
+                ["Hovered Element"] = ThemeHex("#1f2d26"),
+                ["Text"] = ThemeHex("#a8b8ad"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Purple"] = {
+                ["Background"] = ThemeHex("#100e16"),
+                ["Inline"] = ThemeHex("#15121d"),
+                ["Page Background"] = ThemeHex("#221c2e"),
+                ["Border"] = ThemeHex("#0c0a12"),
+                ["Outline"] = ThemeHex("#241e30"),
+                ["Accent"] = ThemeHex("#c084fc"),
+                ["Element"] = ThemeHex("#1a1624"),
+                ["Hovered Element"] = ThemeHex("#261f33"),
+                ["Text"] = ThemeHex("#b4a9c4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Red"] = {
+                ["Background"] = ThemeHex("#140e0e"),
+                ["Inline"] = ThemeHex("#1a1212"),
+                ["Page Background"] = ThemeHex("#2a1c1c"),
+                ["Border"] = ThemeHex("#100a0a"),
+                ["Outline"] = ThemeHex("#2a1f1f"),
+                ["Accent"] = ThemeHex("#ff6b6b"),
+                ["Element"] = ThemeHex("#221616"),
+                ["Hovered Element"] = ThemeHex("#302020"),
+                ["Text"] = ThemeHex("#b8a0a0"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["haze.best"] = {
+                ["Background"] = ThemeHex("#0f1115"),
+                ["Inline"] = ThemeHex("#14181f"),
+                ["Page Background"] = ThemeHex("#1c2330"),
+                ["Border"] = ThemeHex("#0b0d11"),
+                ["Outline"] = ThemeHex("#222a38"),
+                ["Accent"] = ThemeHex("#7dd3fc"),
+                ["Element"] = ThemeHex("#181d27"),
+                ["Hovered Element"] = ThemeHex("#242b38"),
+                ["Text"] = ThemeHex("#a8b3c4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Ocean"] = {
+                ["Background"] = ThemeHex("#0a1218"),
+                ["Inline"] = ThemeHex("#0f1a22"),
+                ["Page Background"] = ThemeHex("#162833"),
+                ["Border"] = ThemeHex("#071015"),
+                ["Outline"] = ThemeHex("#1c303c"),
+                ["Accent"] = ThemeHex("#2dd4bf"),
+                ["Element"] = ThemeHex("#132028"),
+                ["Hovered Element"] = ThemeHex("#1c2e38"),
+                ["Text"] = ThemeHex("#9db8c4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Sunset"] = {
+                ["Background"] = ThemeHex("#14100e"),
+                ["Inline"] = ThemeHex("#1a1411"),
+                ["Page Background"] = ThemeHex("#2a2018"),
+                ["Border"] = ThemeHex("#100c0a"),
+                ["Outline"] = ThemeHex("#2e241c"),
+                ["Accent"] = ThemeHex("#fb923c"),
+                ["Element"] = ThemeHex("#221a14"),
+                ["Hovered Element"] = ThemeHex("#30241c"),
+                ["Text"] = ThemeHex("#c4b09a"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Rose"] = {
+                ["Background"] = ThemeHex("#140f12"),
+                ["Inline"] = ThemeHex("#1a1318"),
+                ["Page Background"] = ThemeHex("#2a1c24"),
+                ["Border"] = ThemeHex("#100a0e"),
+                ["Outline"] = ThemeHex("#2e2028"),
+                ["Accent"] = ThemeHex("#f472b6"),
+                ["Element"] = ThemeHex("#22161c"),
+                ["Hovered Element"] = ThemeHex("#302028"),
+                ["Text"] = ThemeHex("#c4a8b4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Gold"] = {
+                ["Background"] = ThemeHex("#12100a"),
+                ["Inline"] = ThemeHex("#18150e"),
+                ["Page Background"] = ThemeHex("#262018"),
+                ["Border"] = ThemeHex("#0e0c08"),
+                ["Outline"] = ThemeHex("#2a2418"),
+                ["Accent"] = ThemeHex("#fbbf24"),
+                ["Element"] = ThemeHex("#1e1a12"),
+                ["Hovered Element"] = ThemeHex("#2c2618"),
+                ["Text"] = ThemeHex("#c4b896"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Mint"] = {
+                ["Background"] = ThemeHex("#0c1412"),
+                ["Inline"] = ThemeHex("#111a18"),
+                ["Page Background"] = ThemeHex("#1a2824"),
+                ["Border"] = ThemeHex("#080f0d"),
+                ["Outline"] = ThemeHex("#1e2e2a"),
+                ["Accent"] = ThemeHex("#5eead4"),
+                ["Element"] = ThemeHex("#15201c"),
+                ["Hovered Element"] = ThemeHex("#1f2e28"),
+                ["Text"] = ThemeHex("#a8c0b8"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Crimson"] = {
+                ["Background"] = ThemeHex("#120a0c"),
+                ["Inline"] = ThemeHex("#180e12"),
+                ["Page Background"] = ThemeHex("#28141a"),
+                ["Border"] = ThemeHex("#0e080a"),
+                ["Outline"] = ThemeHex("#2c1820"),
+                ["Accent"] = ThemeHex("#e11d48"),
+                ["Element"] = ThemeHex("#1e1014"),
+                ["Hovered Element"] = ThemeHex("#2c181e"),
+                ["Text"] = ThemeHex("#c49aa4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Ice"] = {
+                ["Background"] = ThemeHex("#0e1216"),
+                ["Inline"] = ThemeHex("#13181e"),
+                ["Page Background"] = ThemeHex("#1c2630"),
+                ["Border"] = ThemeHex("#0a0e12"),
+                ["Outline"] = ThemeHex("#222e38"),
+                ["Accent"] = ThemeHex("#a5f3fc"),
+                ["Element"] = ThemeHex("#171e26"),
+                ["Hovered Element"] = ThemeHex("#222c36"),
+                ["Text"] = ThemeHex("#b0c4d0"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Lava"] = {
+                ["Background"] = ThemeHex("#120c0a"),
+                ["Inline"] = ThemeHex("#18100c"),
+                ["Page Background"] = ThemeHex("#281a14"),
+                ["Border"] = ThemeHex("#0e0806"),
+                ["Outline"] = ThemeHex("#2c1e16"),
+                ["Accent"] = ThemeHex("#f97316"),
+                ["Element"] = ThemeHex("#1e1410"),
+                ["Hovered Element"] = ThemeHex("#2c1e16"),
+                ["Text"] = ThemeHex("#c4a890"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Violet"] = {
+                ["Background"] = ThemeHex("#100e18"),
+                ["Inline"] = ThemeHex("#151220"),
+                ["Page Background"] = ThemeHex("#221c32"),
+                ["Border"] = ThemeHex("#0c0a14"),
+                ["Outline"] = ThemeHex("#261e36"),
+                ["Accent"] = ThemeHex("#a78bfa"),
+                ["Element"] = ThemeHex("#1a1628"),
+                ["Hovered Element"] = ThemeHex("#261f36"),
+                ["Text"] = ThemeHex("#b4a8cc"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Nord"] = {
+                ["Background"] = ThemeHex("#1a1e26"),
+                ["Inline"] = ThemeHex("#20242e"),
+                ["Page Background"] = ThemeHex("#2c3340"),
+                ["Border"] = ThemeHex("#14181e"),
+                ["Outline"] = ThemeHex("#343c4a"),
+                ["Accent"] = ThemeHex("#88c0d0"),
+                ["Element"] = ThemeHex("#242933"),
+                ["Hovered Element"] = ThemeHex("#303848"),
+                ["Text"] = ThemeHex("#d8dee9"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Matcha"] = {
+                ["Background"] = ThemeHex("#10140e"),
+                ["Inline"] = ThemeHex("#151a12"),
+                ["Page Background"] = ThemeHex("#222a1c"),
+                ["Border"] = ThemeHex("#0c100a"),
+                ["Outline"] = ThemeHex("#263020"),
+                ["Accent"] = ThemeHex("#a3e635"),
+                ["Element"] = ThemeHex("#1a2016"),
+                ["Hovered Element"] = ThemeHex("#262e1e"),
+                ["Text"] = ThemeHex("#b4c4a0"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Midnight"] = {
+                ["Background"] = ThemeHex("#080810"),
+                ["Inline"] = ThemeHex("#0e0e18"),
+                ["Page Background"] = ThemeHex("#161624"),
+                ["Border"] = ThemeHex("#06060c"),
+                ["Outline"] = ThemeHex("#1c1c2c"),
+                ["Accent"] = ThemeHex("#818cf8"),
+                ["Element"] = ThemeHex("#12121c"),
+                ["Hovered Element"] = ThemeHex("#1c1c2a"),
+                ["Text"] = ThemeHex("#a8a8c4"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Cherry"] = {
+                ["Background"] = ThemeHex("#140c10"),
+                ["Inline"] = ThemeHex("#1a1014"),
+                ["Page Background"] = ThemeHex("#2a1820"),
+                ["Border"] = ThemeHex("#10080c"),
+                ["Outline"] = ThemeHex("#2e1c24"),
+                ["Accent"] = ThemeHex("#fb7185"),
+                ["Element"] = ThemeHex("#221418"),
+                ["Hovered Element"] = ThemeHex("#301c24"),
+                ["Text"] = ThemeHex("#c4a0a8"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+            ["Cyber"] = {
+                ["Background"] = ThemeHex("#0a0e0e"),
+                ["Inline"] = ThemeHex("#0e1414"),
+                ["Page Background"] = ThemeHex("#162020"),
+                ["Border"] = ThemeHex("#080c0c"),
+                ["Outline"] = ThemeHex("#1c2828"),
+                ["Accent"] = ThemeHex("#22d3ee"),
+                ["Element"] = ThemeHex("#121a1a"),
+                ["Hovered Element"] = ThemeHex("#1c2828"),
+                ["Text"] = ThemeHex("#9ec8c8"),
+                ["Text Border"] = FromRGB(0, 0, 0),
+            },
+        }
+    end
+
+    Library.GetThemesFolder = function(self)
+        return self.Folders.Themes or (self.Folders.Directory .. "/Themes")
+    end
+
+    Library.GetThemeAutoloadPath = function(self)
+        return self.Folders.Directory .. "/theme_autoload.json"
+    end
+
+    Library.EnsureThemeFolders = function(self)
+        self.Folders.Themes = self.Folders.Directory .. "/Themes"
+        if not isfolder(self.Folders.Themes) then
+            makefolder(self.Folders.Themes)
+        end
+        local Autoload = self:GetThemeAutoloadPath()
+        if not isfile(Autoload) then
+            writefile(Autoload, "")
+        end
+    end
+
+    Library.AddThemeHook = function(self, Callback)
+        if type(Callback) == "function" then
+            TableInsert(self.ThemeHooks, Callback)
+        end
+    end
+
+    Library.FireThemeHooks = function(self, Key)
+        for _, Callback in self.ThemeHooks do
+            pcall(Callback, Key)
+        end
+    end
+
+    Library.ResolveThemeColor = function(self, Value)
+        if typeof(Value) == "Color3" then
+            return Value
+        end
+        if type(Value) == "string" then
+            local Hex = Value:gsub("#", "")
+            if #Hex == 6 then
+                return FromHex(Hex)
+            end
+        end
+        return nil
+    end
+
+    Library.ApplyThemeColors = function(self, Theme, UpdatePickers)
+        if type(Theme) ~= "table" then
+            return false
+        end
+
+        for _, Index in self.ThemeKeys do
+            local Color = self:ResolveThemeColor(Theme[Index])
+            if not Color then
+                continue
+            end
+
+            self.Theme[Index] = Color
+            self:ChangeTheme(Index, Color)
+
+            if UpdatePickers and self.SetFlags["Theme" .. Index] then
+                self.SetFlags["Theme" .. Index](Color)
+            end
+        end
+
+        self:FireThemeHooks(nil)
+        return true
+    end
+
+    Library.ApplyTheme = function(self, Name, UpdatePickers)
+        return self:ApplyThemeColors(self.Themes[Name], UpdatePickers)
+    end
+
+    Library.GetThemeData = function(self)
+        local Data = { }
+        for _, Index in self.ThemeKeys do
+            local Color = self.Theme[Index]
+            if typeof(Color) == "Color3" then
+                Data[Index] = "#" .. Color:ToHex()
+            end
+        end
+        return HttpService:JSONEncode(Data)
+    end
+
+    Library.LoadThemeData = function(self, Raw, UpdatePickers)
+        local Ok, Decoded = pcall(function()
+            return HttpService:JSONDecode(Raw)
+        end)
+        if Ok and type(Decoded) == "table" then
+            return self:ApplyThemeColors(Decoded, UpdatePickers)
+        end
+        return false
+    end
+
+    Library.GetPresetThemeNames = function(self, PreferredFirst)
+        local Names = { }
+        for Name in pairs(self.Themes) do
+            if Name ~= PreferredFirst then
+                TableInsert(Names, Name)
+            end
+        end
+        table.sort(Names)
+        if PreferredFirst and self.Themes[PreferredFirst] then
+            TableInsert(Names, 1, PreferredFirst)
+        end
+        return Names
+    end
+
+    Library.GetThemeFileName = function(self, Path)
+        local Normalized = StringGSub(tostring(Path), "\\", "/")
+        return string.match(Normalized, "([^/]+)$") or Path
+    end
+
+    Library.RefreshThemesList = function(self, Element)
+        local List = { }
+        local Folder = self:GetThemesFolder()
+        if isfolder(Folder) then
+            for _, Path in listfiles(Folder) do
+                TableInsert(List, self:GetThemeFileName(Path))
+            end
+        end
+        Element:Refresh(List)
+    end
+
+    Library.CreateThemeFile = function(self, Name)
+        self:EnsureThemeFolders()
+        if not Name or Name == "" then
+            self:Notification("Enter a theme name", 3, FromRGB(255, 0, 0))
+            return false
+        end
+        local Path = self:GetThemesFolder() .. "/" .. Name .. ".json"
+        if isfile(Path) then
+            self:Notification("Theme '" .. Name .. ".json' already exists", 3, FromRGB(255, 0, 0))
+            return false
+        end
+        writefile(Path, self:GetThemeData())
+        self:Notification("Created theme '" .. Name .. ".json'", 3, FromRGB(0, 255, 0))
+        return true
+    end
+
+    Library.LoadThemeFile = function(self, FileName, UpdatePickers)
+        if not FileName then
+            return false
+        end
+        local Path = self:GetThemesFolder() .. "/" .. FileName
+        if not isfile(Path) then
+            return false
+        end
+        local Ok, Content = pcall(readfile, Path)
+        if not Ok or not self:LoadThemeData(Content, UpdatePickers ~= false) then
+            self:Notification("Failed to load theme " .. FileName, 3, FromRGB(255, 0, 0))
+            return false
+        end
+        self:Notification("Loaded theme " .. FileName, 3, FromRGB(0, 255, 0))
+        return true
+    end
+
+    Library.SaveThemeFile = function(self, FileName)
+        if not FileName then
+            return false
+        end
+        local Path = self:GetThemesFolder() .. "/" .. FileName
+        writefile(Path, self:GetThemeData())
+        self:Notification("Saved theme " .. FileName, 3, FromRGB(0, 255, 0))
+        return true
+    end
+
+    Library.DeleteThemeFile = function(self, FileName)
+        if not FileName then
+            return false
+        end
+        local Path = self:GetThemesFolder() .. "/" .. FileName
+        if not isfile(Path) then
+            return false
+        end
+        delfile(Path)
+        self:Notification("Deleted theme " .. FileName, 3, FromRGB(0, 255, 0))
+        return true
+    end
+
+    Library.SetThemeAutoload = function(self, FileName)
+        self:EnsureThemeFolders()
+        local Autoload = self:GetThemeAutoloadPath()
+        if not FileName or FileName == "" then
+            writefile(Autoload, "")
+            self:Notification("Theme autoload removed", 3, FromRGB(0, 255, 0))
+            return true
+        end
+        local Path = self:GetThemesFolder() .. "/" .. FileName
+        if not isfile(Path) then
+            return false
+        end
+        writefile(Autoload, readfile(Path))
+        self:Notification("Theme set as autoload", 3, FromRGB(0, 255, 0))
+        return true
+    end
+
+    Library.LoadThemeAutoload = function(self, UpdatePickers)
+        local Path = self:GetThemeAutoloadPath()
+        if not isfile(Path) then
+            return false
+        end
+        local Ok, Content = pcall(readfile, Path)
+        if Ok and type(Content) == "string" and Content ~= "" then
+            return self:LoadThemeData(Content, UpdatePickers ~= false)
+        end
+        return false
+    end
+
+    Library.AddThemeUI = function(self, Page, Data)
+        Data = Data or { }
+        local Default = Data.Default or Data.default or "haze.best"
+        if not self.Themes[Default] then
+            Default = "haze.best"
+        end
+
+        self:EnsureThemeFolders()
+
+        local ThemesSection = Page:Section({Name = "Theme Profiles", Side = 1})
+        local PresetsSection = Page:Section({Name = "Presets", Side = 2})
+        local ColorsSection = Page:Section({Name = "Customize UI", Side = 2})
+
+        local ThemeName
+        local ThemeSelected
+
+        local ThemesListbox = ThemesSection:Listbox({Items = { }, Name = "Themes", Flag = "Themes List", Callback = function(Value)
+            ThemeSelected = Value
+        end})
+
+        ThemesSection:Textbox({Name = "Theme Name", Placeholder = ". .", Flag = "Theme Name", Callback = function(Value)
+            ThemeName = Value
+        end})
+
+        ThemesSection:Button({Name = "Create Theme", Callback = function()
+            if self:CreateThemeFile(ThemeName) then
+                self:RefreshThemesList(ThemesListbox)
+            end
+        end})
+
+        ThemesSection:Button({Name = "Load Theme", Callback = function()
+            self:LoadThemeFile(ThemeSelected, true)
+        end})
+
+        ThemesSection:Button({Name = "Delete Theme", Callback = function()
+            if self:DeleteThemeFile(ThemeSelected) then
+                ThemeSelected = nil
+                self:RefreshThemesList(ThemesListbox)
+            end
+        end})
+
+        ThemesSection:Button({Name = "Save Theme", Callback = function()
+            self:SaveThemeFile(ThemeSelected)
+        end})
+
+        ThemesSection:Button({Name = "Refresh Themes", Callback = function()
+            self:RefreshThemesList(ThemesListbox)
+        end})
+
+        ThemesSection:Divider()
+
+        ThemesSection:Button({Name = "Set As Autoload", Callback = function()
+            self:SetThemeAutoload(ThemeSelected)
+        end})
+
+        ThemesSection:Button({Name = "Remove Autoload", Callback = function()
+            self:SetThemeAutoload(nil)
+        end})
+
+        self:RefreshThemesList(ThemesListbox)
+
+        PresetsSection:Dropdown({
+            Name = "Theme",
+            Flag = "UI Theme",
+            Default = Default,
+            MaxSize = 168,
+            Items = self:GetPresetThemeNames(Default),
+            Callback = function(Value)
+                self:ApplyTheme(Value, true)
+            end
+        })
+
+        for _, Key in self.ThemeKeys do
+            ColorsSection:Label({Name = Key, Alignment = "Left"}):Colorpicker({
+                Name = Key,
+                Default = self.Theme[Key],
+                Flag = "Theme" .. Key,
+                Callback = function(Color)
+                    self.Theme[Key] = Color
+                    self:ChangeTheme(Key, Color)
+                    self:FireThemeHooks(Key)
+                end
+            })
         end
     end
 
@@ -5425,18 +5991,22 @@ local Library do
             Library:RefreshConfigsList(ConfigsListbox)
         end
 
-        Library.Init = function(self)
-            local Path = Library.Folders.Directory .. "/autoload.json"
-            if not isfile(Path) then
-                return
-            end
+    end
+end
 
-            local Ok, Content = pcall(readfile, Path)
-            if Ok and type(Content) == "string" and Content ~= "" then
-                Library:LoadConfig(Content)
-            end
+Library.Init = function(self)
+    local Path = self.Folders.Directory .. "/autoload.json"
+    if isfile(Path) then
+        local Ok, Content = pcall(readfile, Path)
+        if Ok and type(Content) == "string" and Content ~= "" then
+            self:LoadConfig(Content)
         end
     end
+
+    self:EnsureThemeFolders()
+    task.defer(function()
+        self:LoadThemeAutoload(true)
+    end)
 end
 
 getgenv().Library = Library
