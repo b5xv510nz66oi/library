@@ -1,13 +1,13 @@
 --[[
-    Thugsense UI Library (haze fork) — LINED variant
-    Based on samet / Thugsense
+    Thugsense UI Library (haze fork) — LINED variant 2
+    Based on samet / Thugsense — gamesense chrome (not Thugsense boxes)
 
     Lined chrome (gamesense style):
     - Window: dark nested borders + 1px top accent hairline (not pink ring)
     - Top tabs: text + accent underline + separators
     - MultiSection: titled groupbox + internal text tabs with underline
     - Sections: thin 1px groupboxes, title on border
-    - Controls: flat checkbox / thin slider / flat dropdown
+    - Controls: flat checkbox / thin slider / flat dropdown / flat buttons
     Upload as library_lined.lua and load when UI Style = Lined.
 
     Assign different flags to each element to prevent from configs overriding eachother
@@ -3610,9 +3610,10 @@ local Library do
                         CanvasSize = UDim2New(0, 0, 0, 0)
                     })  NewColumn:AddToTheme({ScrollBarImageColor3 = "Accent"})
                     
+                    -- extra top pad so groupbox titles on the border are not clipped
                     Instances:Create("UIPadding", {
                         Parent = NewColumn.Instance,
-                        PaddingTop = UDimNew(0, 6),
+                        PaddingTop = UDimNew(0, 12),
                         PaddingBottom = UDimNew(0, 6),
                         PaddingRight = UDimNew(0, 6),
                         PaddingLeft = UDimNew(0, 6)
@@ -3620,7 +3621,7 @@ local Library do
                     
                     Instances:Create("UIListLayout", {
                         Parent = NewColumn.Instance,
-                        Padding = UDimNew(0, 8),
+                        Padding = UDimNew(0, 10),
                         SortOrder = Enum.SortOrder.LayoutOrder
                     }) 
 
@@ -3948,7 +3949,7 @@ local Library do
 
                 Instances:Create("UIPadding", {
                     Parent = NewColumn.Instance,
-                    PaddingTop = UDimNew(0, 6),
+                    PaddingTop = UDimNew(0, 12),
                     PaddingBottom = UDimNew(0, 6),
                     PaddingRight = UDimNew(0, 6),
                     PaddingLeft = UDimNew(0, 6)
@@ -3956,7 +3957,7 @@ local Library do
 
                 Instances:Create("UIListLayout", {
                     Parent = NewColumn.Instance,
-                    Padding = UDimNew(0, 8),
+                    Padding = UDimNew(0, 10),
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }) 
 
@@ -4042,6 +4043,7 @@ local Library do
                 BorderColor3 = FromRGB(42, 42, 42),
                 BorderSizePixel = 1,
                 AutomaticSize = Enum.AutomaticSize.Y,
+                ClipsDescendants = false,
                 BackgroundColor3 = FromRGB(17, 17, 17)
             })  Items["Section"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
             
@@ -4149,6 +4151,7 @@ local Library do
                 BorderColor3 = FromRGB(42, 42, 42),
                 BorderSizePixel = 1,
                 AutomaticSize = Enum.AutomaticSize.Y,
+                ClipsDescendants = false,
                 BackgroundColor3 = FromRGB(17, 17, 17)
             })  Items["MultiSection"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
 
@@ -4790,19 +4793,20 @@ local Library do
         local Items = { } do 
             Items["Button"] = Instances:Create("TextButton", {
                 Parent = Button.Section.Elements["Content"].Instance,
-                BorderColor3 = FromRGB(10, 10, 10),
+                BorderColor3 = FromRGB(42, 42, 42),
                 AutoButtonColor = false,
                 Name = "\0",
                 Position = UDim2New(0, 0, 1, 0),
-                Size = UDim2New(1, 0, 0, 17),
+                Size = UDim2New(1, 0, 0, 16),
                 Selectable = false,
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(33, 33, 36)
-            })  Items["Button"]:AddToTheme({BackgroundColor3 = "Element", BorderColor3 = "Border"})
+                BorderSizePixel = 1,
+                BackgroundColor3 = FromRGB(22, 22, 22)
+            })  Items["Button"]:AddToTheme({BackgroundColor3 = "Element", BorderColor3 = "Outline"})
 
             Instances:Create("UIGradient", {
                 Parent = Items["Button"].Instance,
                 Rotation = 90,
+                Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(100, 100, 100))}
             }) 
             
@@ -4811,7 +4815,7 @@ local Library do
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
                 LineJoinMode = Enum.LineJoinMode.Miter,
                 Name = "\0",
-                Color = FromRGB(27, 27, 32)
+                Color = FromRGB(42, 42, 42)
             }):AddToTheme({Color = "Outline"}) 
             
             Items["Text"] = Instances:Create("TextLabel", {
@@ -4833,36 +4837,34 @@ local Library do
             Items["TextBorder"] = Instances:Create("UIStroke", {
                 Parent = Items["Text"].Instance,
                 LineJoinMode = Enum.LineJoinMode.Miter,
-                Name = "\0"
+                Name = "\0",
+                Enabled = false
             }):AddToTheme({Color = "Text Border"})
 
             Items["Button"]:OnHover(function()
                 Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme["Hovered Element"]})
-                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Hovered Element", BorderColor3 = "Border"})
+                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Hovered Element", BorderColor3 = "Outline"})
             end)
 
             Items["Button"]:OnHoverLeave(function()
                 Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme["Element"]})
-                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element", BorderColor3 = "Border"})
+                Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element", BorderColor3 = "Outline"})
             end)
         end
 
         function Button:Press()
             Library:SafeCall(Button.Callback)
 
-            Items["Text"]:ChangeItemTheme({TextColor3 = "Accent"})
-            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Accent"})
+            -- gamesense: brief brighten, never flood the button with Accent
+            Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme["Hovered Element"]})
+            Items["Text"]:Tween(nil, {TextTransparency = 0})
 
-            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Accent})
-            Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Accent})
+            task.wait(0.08)
 
-            task.wait(0.1)
-
+            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element", BorderColor3 = "Outline"})
             Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
-            Items["Button"]:ChangeItemTheme({BackgroundColor3 = "Element"})
-
-            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text})
             Items["Button"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
+            Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text})
         end
 
         function Button:SetVisiblity(Bool)
@@ -8583,8 +8585,9 @@ Library.CreateEspPreview = function(self, Window, Options)
     end
 
     ApplyEspPreviewOverlays = function()
-        Accent.BackgroundColor3 = self.Theme.Accent or Color3.fromRGB(125, 211, 252)
-        PanelStroke.Color = self.Theme.Accent or Color3.fromRGB(125, 211, 252)
+        Accent.BackgroundColor3 = self.Theme.Accent or Color3.fromRGB(179, 100, 122)
+        -- gamesense: panel outline stays dark; accent is only the top hairline
+        PanelStroke.Color = self.Theme.Outline or Color3.fromRGB(42, 42, 42)
         BoxStroke.Color = BoxWhite
         NameTag.TextColor3 = EspPreviewColor
         NameTag.Text = LocalPlayer and LocalPlayer.DisplayName or "enemy"
