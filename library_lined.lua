@@ -2,7 +2,11 @@
     Thugsense UI Library (haze fork) — LINED variant
     Based on samet / Thugsense
 
-    Lined chrome: text tabs + accent underlines (not boxed icon subtabs).
+    Lined chrome (games-menu style):
+    - Top tabs: text + accent underline + separators (not filled boxes)
+    - Subtabs: text + underline, left-packed
+    - Sections: thin 1px groupboxes (no fat accent bar)
+    - Toggles: flat square checkbox, solid accent when on
     Upload as library_lined.lua and load when UI Style = Lined.
 
     Assign different flags to each element to prevent from configs overriding eachother
@@ -240,7 +244,7 @@ local Library do
             ["Page Background"] = FromHex("#222222"),
             ["Border"] = FromHex("#0a0a0a"),
             ["Outline"] = FromHex("#2a2a2a"),
-            ["Accent"] = FromHex("#c45a78"),
+            ["Accent"] = FromHex("#b3647a"),
             ["Element"] = FromHex("#1c1c1c"),
             ["Hovered Element"] = FromHex("#2a2a2a"),
             ["Text"] = FromHex("#d0d0d0"),
@@ -1157,7 +1161,7 @@ local Library do
                 ["Page Background"] = ThemeHex("#222222"),
                 ["Border"] = ThemeHex("#0a0a0a"),
                 ["Outline"] = ThemeHex("#2a2a2a"),
-                ["Accent"] = ThemeHex("#c45a78"),
+                ["Accent"] = ThemeHex("#b3647a"),
                 ["Element"] = ThemeHex("#1c1c1c"),
                 ["Hovered Element"] = ThemeHex("#2a2a2a"),
                 ["Text"] = ThemeHex("#d0d0d0"),
@@ -3225,10 +3229,21 @@ local Library do
             Instances:Create("UIListLayout", {
                 Parent = Items["Pages"].Instance,
                 FillDirection = Enum.FillDirection.Horizontal,
-                HorizontalFlex = Enum.UIFlexAlignment.Fill,
-                Padding = UDimNew(0, 2),
+                HorizontalFlex = Enum.UIFlexAlignment.None,
+                HorizontalAlignment = Enum.HorizontalAlignment.Left,
+                VerticalAlignment = Enum.VerticalAlignment.Center,
+                Padding = UDimNew(0, 0),
                 SortOrder = Enum.SortOrder.LayoutOrder
             })
+
+            Items["TabLine"] = Instances:Create("Frame", {
+                Parent = Items["Inline"].Instance,
+                Name = "\0",
+                Position = UDim2New(0, 4, 0, 26),
+                Size = UDim2New(1, -8, 0, 1),
+                BorderSizePixel = 0,
+                BackgroundColor3 = FromRGB(42, 42, 42)
+            })  Items["TabLine"]:AddToTheme({BackgroundColor3 = "Outline"})
 
             Items["Content"] = Instances:Create("Frame", {
                 Parent = Items["Inline"].Instance,
@@ -3385,7 +3400,7 @@ local Library do
                                     Hide.BackgroundColor3 = Library.Theme.Accent
                                 end
                                 if Inactive then
-                                    Inactive.BackgroundColor3 = Library.Theme["Page Background"]
+                                    Inactive.BackgroundTransparency = 1
                                 end
                             else
                                 if Text then
@@ -3396,7 +3411,7 @@ local Library do
                                     Hide.Visible = false
                                 end
                                 if Inactive then
-                                    Inactive.BackgroundColor3 = Library.Theme.Element
+                                    Inactive.BackgroundTransparency = 1
                                 end
                             end
                         end
@@ -3447,6 +3462,8 @@ local Library do
         }
 
         local Items = { } do 
+            local PageTabWidth = math.max(44, (#Page.Name * 7) + 20)
+
             Items["Inactive"] = Instances:Create("TextButton", {
                 Parent = Page.Window.Elements["Pages"].Instance,
                 FontFace = Library.Font,
@@ -3455,12 +3472,12 @@ local Library do
                 Text = "",
                 AutoButtonColor = false,
                 Name = "\0",
-                Size = UDim2New(1, 0, 1, 0),
+                Size = UDim2New(0, PageTabWidth, 1, 0),
                 BorderSizePixel = 0,
                 TextSize = 14,
-                BackgroundTransparency = 0,
+                BackgroundTransparency = 1,
                 BackgroundColor3 = FromRGB(28, 28, 28)
-            })  Items["Inactive"]:AddToTheme({BackgroundColor3 = "Page Background"})
+            })
 
             Instances:Create("UIStroke", {
                 Parent = Items["Inactive"].Instance,
@@ -3468,17 +3485,17 @@ local Library do
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
                 Color = Library.Theme.Outline,
                 Name = "\0",
-                Enabled = true
+                Enabled = false
             }):AddToTheme({Color = "Outline"})
             
             Items["Text"] = Instances:Create("TextLabel", {
                 Parent = Items["Inactive"].Instance,
                 FontFace = Library.Font,
-                TextColor3 = FromRGB(180, 180, 180),
-                TextTransparency = 0.25,
+                TextColor3 = FromRGB(160, 160, 160),
+                TextTransparency = 0.2,
                 Text = Page.Name,
                 Name = "\0",
-                Size = UDim2New(1, 0, 1, 0),
+                Size = UDim2New(1, 0, 1, -2),
                 BackgroundTransparency = 1,
                 Position = UDim2New(0, 0, 0, 0),
                 BorderSizePixel = 0,
@@ -3494,15 +3511,15 @@ local Library do
                 Enabled = false
             }):AddToTheme({Color = "Text Border"})
             
-            -- pink line on TOP of active tab (reference)
+            -- accent underline under active tab text
             Items["Hide"] = Instances:Create("Frame", {
                 Parent = Items["Inactive"].Instance,
                 Visible = false,
                 BorderColor3 = FromRGB(0, 0, 0),
-                AnchorPoint = Vector2New(0, 0),
+                AnchorPoint = Vector2New(0, 1),
                 Name = "\0",
-                Position = UDim2New(0, 0, 0, 0),
-                Size = UDim2New(1, 0, 0, 1),
+                Position = UDim2New(0, 4, 1, 0),
+                Size = UDim2New(1, -8, 0, 1),
                 ZIndex = 3,
                 BorderSizePixel = 0,
                 BackgroundColor3 = Library.Theme.Accent
@@ -3525,10 +3542,21 @@ local Library do
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1
             })
+
+            Items["Sep"] = Instances:Create("Frame", {
+                Parent = Items["Inactive"].Instance,
+                AnchorPoint = Vector2New(1, 0.5),
+                Position = UDim2New(1, 0, 0.5, 0),
+                Size = UDim2New(0, 1, 0, 10),
+                BorderSizePixel = 0,
+                BackgroundColor3 = FromRGB(42, 42, 42),
+                ZIndex = 2
+            })  Items["Sep"]:AddToTheme({BackgroundColor3 = "Outline"})
             
             Items["UIGradient"] = Instances:Create("UIGradient", {
                 Parent = Items["Inactive"].Instance,
                 Rotation = 90,
+                Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(140, 140, 140))}
             })            
 
@@ -3613,8 +3641,9 @@ local Library do
                 Instances:Create("UIListLayout", {
                     Parent = Items["SubTabs"].Instance,
                     FillDirection = Enum.FillDirection.Horizontal,
-                    HorizontalFlex = Enum.UIFlexAlignment.Fill,
-                    Padding = UDimNew(0, 3),
+                    HorizontalFlex = Enum.UIFlexAlignment.None,
+                    HorizontalAlignment = Enum.HorizontalAlignment.Left,
+                    Padding = UDimNew(0, 14),
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }) 
             end
@@ -3633,15 +3662,11 @@ local Library do
 
             if Bool then 
                 Items["Page"].Instance.Visible = true
-                Items["Inactive"]:Tween(nil, {BackgroundColor3 = Library.Theme["Page Background"]})
-                Items["Inactive"]:ChangeItemTheme({BackgroundColor3 = "Page Background"})
                 Items["Text"]:Tween(nil, {TextColor3 = FromRGB(235, 235, 235), TextTransparency = 0})
                 Items["Hide"].Instance.Visible = true
                 Items["Hide"].Instance.BackgroundColor3 = Library.Theme.Accent
                 Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
             else
-                Items["Inactive"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
-                Items["Inactive"]:ChangeItemTheme({BackgroundColor3 = "Element"})
                 Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text, TextTransparency = 0.35})
                 Items["Hide"].Instance.Visible = false
                 Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
@@ -3693,7 +3718,7 @@ local Library do
                             Hide.BackgroundColor3 = Library.Theme.Accent
                         end
                         if Inactive then
-                            Inactive.BackgroundColor3 = Library.Theme["Page Background"]
+                            Inactive.BackgroundTransparency = 1
                         end
                     else
                         if Text then
@@ -3704,7 +3729,7 @@ local Library do
                             Hide.Visible = false
                         end
                         if Inactive then
-                            Inactive.BackgroundColor3 = Library.Theme.Element
+                            Inactive.BackgroundTransparency = 1
                         end
                     end
                 end
@@ -3755,6 +3780,8 @@ local Library do
             Elements = { }
         }
 
+        local TabWidth = math.max(44, (#SubPage.Name * 7) + 8)
+
         local Items = { } do
             Items["Inactive"] = Instances:Create("TextButton", {
                 Parent = SubPage.Page.Elements["SubTabs"].Instance,
@@ -3764,12 +3791,12 @@ local Library do
                 Text = "",
                 AutoButtonColor = false,
                 Name = "\0",
-                Size = UDim2New(1, 0, 1, 0),
+                Size = UDim2New(0, TabWidth, 1, 0),
                 BorderSizePixel = 0,
                 TextSize = 14,
-                BackgroundTransparency = 0,
+                BackgroundTransparency = 1,
                 BackgroundColor3 = FromRGB(28, 28, 28)
-            })  Items["Inactive"]:AddToTheme({BackgroundColor3 = "Element"})
+            })
             Items["Inactive"].Instance:SetAttribute("haze_nofade", true)
 
             Instances:Create("UIStroke", {
@@ -3778,16 +3805,16 @@ local Library do
                 LineJoinMode = Enum.LineJoinMode.Miter,
                 Name = "\0",
                 Color = FromRGB(42, 42, 42),
-                Enabled = true
+                Enabled = false
             }):AddToTheme({Color = "Outline"})
 
             Items["Hide"] = Instances:Create("Frame", {
                 Parent = Items["Inactive"].Instance,
                 Visible = false,
                 BorderColor3 = FromRGB(0, 0, 0),
-                AnchorPoint = Vector2New(0, 0),
+                AnchorPoint = Vector2New(0, 1),
                 Name = "\0",
-                Position = UDim2New(0, 0, 0, 0),
+                Position = UDim2New(0, 0, 1, 0),
                 Size = UDim2New(1, 0, 0, 1),
                 ZIndex = 5,
                 BorderSizePixel = 0,
@@ -3838,12 +3865,12 @@ local Library do
             Items["Text"] = Instances:Create("TextLabel", {
                 Parent = Items["Inactive"].Instance,
                 FontFace = Library.Font,
-                TextColor3 = FromRGB(180, 180, 180),
-                TextTransparency = 0.25,
+                TextColor3 = FromRGB(160, 160, 160),
+                TextTransparency = 0.2,
                 Text = SubPage.Name,
                 Name = "\0",
                 BackgroundTransparency = 1,
-                Size = UDim2New(1, 0, 1, 0),
+                Size = UDim2New(1, 0, 1, -2),
                 BorderSizePixel = 0,
                 TextSize = 12,
                 BackgroundColor3 = FromRGB(255, 255, 255)
@@ -3853,7 +3880,7 @@ local Library do
             Instances:Create("UIGradient", {
                 Parent = Items["Inactive"].Instance,
                 Rotation = 90,
-                Enabled = true,
+                Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(140, 140, 140))}
             }) 
 
@@ -3938,16 +3965,12 @@ local Library do
                 Items["Subtab"].Instance.Visible = true
                 Items["Hide"].Instance.Visible = true
                 Items["Hide"].Instance.BackgroundColor3 = Library.Theme.Accent
-                Items["Inactive"]:Tween(nil, {BackgroundColor3 = Library.Theme["Page Background"]})
-                Items["Inactive"]:ChangeItemTheme({BackgroundColor3 = "Page Background"})
                 if Items["Text"] then
                     Items["Text"]:Tween(nil, {TextColor3 = FromRGB(235, 235, 235), TextTransparency = 0})
                     Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
                 end
             else
                 Items["Hide"].Instance.Visible = false
-                Items["Inactive"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
-                Items["Inactive"]:ChangeItemTheme({BackgroundColor3 = "Element"})
                 if Items["Text"] then
                     Items["Text"]:Tween(nil, {TextColor3 = Library.Theme.Text, TextTransparency = 0.35})
                     Items["Text"]:ChangeItemTheme({TextColor3 = "Text"})
@@ -4000,18 +4023,19 @@ local Library do
                 Parent = Section.Page.ColumnsData[Section.Side].Instance,
                 Name = "\0",
                 Size = UDim2New(1, 0, 0, 25),
-                BorderColor3 = FromRGB(27, 27, 32),
-                BorderSizePixel = 2,
+                BorderColor3 = FromRGB(40, 40, 40),
+                BorderSizePixel = 1,
                 AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundColor3 = FromRGB(20, 20, 25)
+                BackgroundColor3 = FromRGB(17, 17, 17)
             })  Items["Section"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Outline"})
             
             Instances:Create("UIStroke", {
                 Parent = Items["Section"].Instance,
-                Color = FromRGB(10, 10, 10),
+                Color = FromRGB(40, 40, 40),
+                Thickness = 1,
                 Name = "\0",
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Border"})
+            }):AddToTheme({Color = "Outline"})
             
             Instances:Create("UIPadding", {
                 Parent = Items["Section"].Instance,
@@ -4021,8 +4045,9 @@ local Library do
             Items["AccentLine"] = Instances:Create("Frame", {
                 Parent = Items["Section"].Instance,
                 Name = "\0",
+                Visible = false,
                 BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, 0, 0, 2),
+                Size = UDim2New(1, 0, 0, 1),
                 BorderSizePixel = 0,
                 BackgroundColor3 = FromRGB(235, 157, 255)
             })  Items["AccentLine"]:AddToTheme({BackgroundColor3 = "Accent"})
@@ -4030,6 +4055,7 @@ local Library do
             Instances:Create("UIGradient", {
                 Parent = Items["AccentLine"].Instance,
                 Rotation = 90,
+                Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(65, 65, 65))}
             })
             
@@ -4043,7 +4069,7 @@ local Library do
                 Size = UDim2New(1, -12, 0, 15),
                 BackgroundTransparency = 1,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Position = UDim2New(0, 4, 0, 2),
+                Position = UDim2New(0, 6, 0, 3),
                 BorderSizePixel = 0,
                 TextSize = 12,
                 BackgroundColor3 = FromRGB(255, 255, 255)
@@ -4560,23 +4586,24 @@ local Library do
             Items["Indicator"] = Instances:Create("Frame", {
                 Parent = Items["Toggle"].Instance,
                 Name = "\0",
-                BorderColor3 = FromRGB(10, 10, 10),
-                Size = UDim2New(0, 10, 0, 10),
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(33, 33, 36)
-            })  Items["Indicator"]:AddToTheme({BackgroundColor3 = "Element", BorderColor3 = "Border"})
+                BorderColor3 = FromRGB(40, 40, 40),
+                Size = UDim2New(0, 9, 0, 9),
+                BorderSizePixel = 1,
+                BackgroundColor3 = FromRGB(22, 22, 22)
+            })  Items["Indicator"]:AddToTheme({BackgroundColor3 = "Element", BorderColor3 = "Outline"})
             
             Instances:Create("UIStroke", {
                 Parent = Items["Indicator"].Instance,
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
                 LineJoinMode = Enum.LineJoinMode.Miter,
                 Name = "\0",
-                Color = FromRGB(27, 27, 32)
+                Color = FromRGB(50, 50, 50)
             }):AddToTheme({Color = "Outline"})
             
             Instances:Create("UIGradient", {
                 Parent = Items["Indicator"].Instance,
                 Rotation = 90,
+                Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(100, 100, 100))}
             }) 
             
