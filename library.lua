@@ -62,6 +62,7 @@ getgenv().library = {
 		"/configs",
 	},
 	font,
+	rev = 3, -- bump when loader must invalidate stale executor cache
 }
 
 local flags = library.flags
@@ -99,6 +100,11 @@ local themes = {
 		},
 		["text"] = {
 			["TextColor3"] = {},
+			["ImageColor3"] = {},
+		},
+		["unselected_text"] = {
+			["TextColor3"] = {},
+			["ImageColor3"] = {},
 		},
 		["text_outline"] = {
 			["Color"] = {},
@@ -383,7 +389,14 @@ function library:round(number, float)
 end
 
 function library:apply_theme(instance, theme, property)
-	table.insert(themes.utility[theme][property], instance)
+	local bucket = themes.utility[theme]
+	if not bucket then
+		return
+	end
+	if not bucket[property] then
+		bucket[property] = {}
+	end
+	table.insert(bucket[property], instance)
 end
 
 function library:update_theme(theme, color)
