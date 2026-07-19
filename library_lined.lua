@@ -3619,24 +3619,34 @@ local Library do
                 Items["Columns"] = Instances:Create("Frame", {
                     Parent = Items["Page"].Instance,
                     Name = "\0",
-                    Position = UDim2New(0, 6, 0, 32),
+                    Position = UDim2New(0, 4, 0, 28),
                     BorderColor3 = FromRGB(10, 10, 10),
-                    Size = UDim2New(1, -12, 1, -38),
+                    Size = UDim2New(1, -8, 1, -32),
                     BorderSizePixel = 0,
+                    BackgroundTransparency = 1,
                     BackgroundColor3 = FromRGB(18, 18, 18)
-                })  Items["Columns"]:AddToTheme({BackgroundColor3 = "Background", BorderColor3 = "Border"})
+                })
 
                 Items["SubTabs"] = Instances:Create("Frame", {
                     Parent = Items["Page"].Instance,
                     Name = "\0",
                     BackgroundTransparency = 1,
-                    Position = UDim2New(0, 6, 0, 6),
+                    Position = UDim2New(0, 6, 0, 4),
                     BorderColor3 = FromRGB(0, 0, 0),
-                    Size = UDim2New(1, -12, 0, 22),
+                    Size = UDim2New(1, -12, 0, 20),
                     BorderSizePixel = 0,
                     BackgroundColor3 = FromRGB(255, 255, 255)
                 })
                 Items["SubTabs"].Instance:SetAttribute("haze_nofade", true)
+
+                Items["SubTabLine"] = Instances:Create("Frame", {
+                    Parent = Items["Page"].Instance,
+                    Name = "\0",
+                    Position = UDim2New(0, 4, 0, 24),
+                    Size = UDim2New(1, -8, 0, 1),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(42, 42, 42)
+                })  Items["SubTabLine"]:AddToTheme({BackgroundColor3 = "Outline"})
 
                 Instances:Create("UIListLayout", {
                     Parent = Items["SubTabs"].Instance,
@@ -3909,13 +3919,6 @@ local Library do
                 VerticalFlex = Enum.UIFlexAlignment.Fill
             }) 
 
-            Instances:Create("UIStroke", {
-                Parent = Items["Subtab"].Instance,
-                Color = FromRGB(27, 27, 32),
-                Name = "\0",
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Outline"})
-
             for Index = 1, SubPage.Columns do
                 local NewColumn = Instances:Create("ScrollingFrame", {
                     Parent = Items["Subtab"].Instance,
@@ -4018,12 +4021,14 @@ local Library do
             Elements = { }
         }
 
-        local Items = { } do 
+        local Items = { } do
+            local TitleWidth = math.max(28, (#Section.Name * 7) + 12)
+
             Items["Section"] = Instances:Create("Frame", {
                 Parent = Section.Page.ColumnsData[Section.Side].Instance,
                 Name = "\0",
                 Size = UDim2New(1, 0, 0, 25),
-                BorderColor3 = FromRGB(40, 40, 40),
+                BorderColor3 = FromRGB(42, 42, 42),
                 BorderSizePixel = 1,
                 AutomaticSize = Enum.AutomaticSize.Y,
                 BackgroundColor3 = FromRGB(17, 17, 17)
@@ -4031,7 +4036,7 @@ local Library do
             
             Instances:Create("UIStroke", {
                 Parent = Items["Section"].Instance,
-                Color = FromRGB(40, 40, 40),
+                Color = FromRGB(42, 42, 42),
                 Thickness = 1,
                 Name = "\0",
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -4039,6 +4044,7 @@ local Library do
             
             Instances:Create("UIPadding", {
                 Parent = Items["Section"].Instance,
+                PaddingTop = UDimNew(0, 4),
                 PaddingBottom = UDimNew(0, 6)
             })
             
@@ -4058,7 +4064,8 @@ local Library do
                 Enabled = false,
                 Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(65, 65, 65))}
             })
-            
+
+            -- gamesense-style title sitting on the top border
             Items["Text"] = Instances:Create("TextLabel", {
                 Parent = Items["Section"].Instance,
                 FontFace = Library.Font,
@@ -4066,28 +4073,30 @@ local Library do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = Section.Name,
                 Name = "\0",
-                Size = UDim2New(1, -12, 0, 15),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Position = UDim2New(0, 6, 0, 3),
+                Size = UDim2New(0, TitleWidth, 0, 14),
+                BackgroundTransparency = 0,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                Position = UDim2New(0, 8, 0, -7),
                 BorderSizePixel = 0,
+                ZIndex = 3,
                 TextSize = 12,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            })  Items["Text"]:AddToTheme({TextColor3 = "Text"})
+                BackgroundColor3 = FromRGB(17, 17, 17)
+            })  Items["Text"]:AddToTheme({TextColor3 = "Text", BackgroundColor3 = "Inline"})
             
             Instances:Create("UIStroke", {
                 Parent = Items["Text"].Instance,
                 LineJoinMode = Enum.LineJoinMode.Miter,
-                Name = "\0"
+                Name = "\0",
+                Enabled = false
             }):AddToTheme({Color = "Text Border"})
             
             Items["Content"] = Instances:Create("Frame", {
                 Parent = Items["Section"].Instance,
                 Name = "\0",
                 BackgroundTransparency = 1,
-                Position = UDim2New(0, 7, 0, 21),
+                Position = UDim2New(0, 7, 0, 12),
                 BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, -14, 1, -20),
+                Size = UDim2New(1, -14, 1, -14),
                 BorderSizePixel = 0,
                 BackgroundColor3 = FromRGB(255, 255, 255)
             })
