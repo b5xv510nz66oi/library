@@ -433,6 +433,14 @@ function library:window(properties)
 	}
 
 	local animated_text = library:animation(cfg.name .. " | private")
+	-- nested chrome eats ~50px; pixel font ~7px/char — keep text inside the inner outline
+	local function watermark_need(text)
+		return math.max(140, (#tostring(text) * 7) + 56)
+	end
+	local watermark_width = 140
+	for _, frame_text in next, animated_text do
+		watermark_width = math.max(watermark_width, watermark_need(frame_text))
+	end
 
 	-- watermark
 	local __holder = library:create("Frame", {
@@ -442,7 +450,6 @@ function library:window(properties)
 		Position = UDim2.new(0, 20, 0, 20),
 		BorderColor3 = Color3.fromRGB(19, 19, 19),
 		ZIndex = 2,
-		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 	})
 
@@ -452,7 +459,7 @@ function library:window(properties)
 		Active = true,
 		Draggable = true,
 		BorderColor3 = Color3.fromRGB(0, 0, 0),
-		Size = UDim2.new(0, ((#animated_text / 2) * 5) + 13, 0, 40),
+		Size = UDim2.new(0, watermark_width, 0, 40),
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 	})
 
@@ -547,7 +554,8 @@ function library:window(properties)
 	local UIPadding = library:create("UIPadding", {
 		Parent = tabs,
 		Name = "",
-		PaddingRight = UDim.new(0, 21),
+		PaddingRight = UDim.new(0, 10),
+		PaddingLeft = UDim.new(0, 0),
 	})
 
 	local glow = library:create("ImageLabel", {
@@ -575,6 +583,10 @@ function library:window(properties)
 				for i = 1, #animated_text do
 					task.wait(0.2)
 					name.Text = animated_text[i]
+					local need = watermark_need(animated_text[i])
+					if inline1.Size.X.Offset < need then
+						inline1.Size = UDim2.new(0, need, 0, 40)
+					end
 				end
 			end
 			task.wait(0.2)
@@ -2509,10 +2521,112 @@ function library:notification(properties)
 	table.insert(library.notifications, holder)
 end
 
+local function library_make_columns(parent)
+	local scrolling_columns = library:create("Frame", {
+		Parent = parent,
+		Name = "",
+		ClipsDescendants = true,
+		BorderColor3 = Color3.fromRGB(0, 0, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		BorderSizePixel = 0,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	})
+
+	library:create("UIListLayout", {
+		Parent = scrolling_columns,
+		Name = "",
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalFlex = Enum.UIFlexAlignment.Fill,
+		Padding = UDim.new(0, 5),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+
+	local left = library:create("ScrollingFrame", {
+		Parent = scrolling_columns,
+		Name = "",
+		ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
+		Active = true,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 0,
+		Size = UDim2.new(0.5, -64, 1, 0),
+		ClipsDescendants = false,
+		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+	})
+
+	left:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		if library.current_element_open then
+			library.current_element_open.set_visible(false)
+			library.current_element_open.open = false
+			library.current_element_open = nil
+		end
+	end)
+
+	library:create("UIListLayout", {
+		Parent = left,
+		Name = "",
+		Padding = UDim.new(0, 6),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+
+	library:create("UIPadding", {
+		Parent = left,
+		Name = "",
+		PaddingBottom = UDim.new(0, 15),
+	})
+
+	local right = library:create("ScrollingFrame", {
+		Parent = scrolling_columns,
+		Name = "",
+		ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
+		Active = true,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 0,
+		Size = UDim2.new(0.5, -64, 1, 0),
+		ClipsDescendants = false,
+		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+	})
+
+	right:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		if library.current_element_open then
+			library.current_element_open.set_visible(false)
+			library.current_element_open.open = false
+			library.current_element_open = nil
+		end
+	end)
+
+	library:create("UIListLayout", {
+		Parent = right,
+		Name = "",
+		Padding = UDim.new(0, 6),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+
+	library:create("UIPadding", {
+		Parent = right,
+		Name = "",
+		PaddingBottom = UDim.new(0, 15),
+	})
+
+	return scrolling_columns, left, right
+end
+
 function library:tab(properties)
 	local cfg = {
 		name = properties.name or "tab",
+		icon = properties.icon or properties.Icon or nil,
+		has_subtabs = properties.subtabs or properties.Subtabs or false,
 		enabled = false,
+		subtabs = {},
+		current_subtab = nil,
 	}
 
 	-- Button
@@ -2522,14 +2636,49 @@ function library:tab(properties)
 		FontFace = library.font,
 		TextColor3 = themes.preset.unselected_text,
 		BorderColor3 = Color3.fromRGB(0, 0, 0),
-		Text = cfg.name,
+		Text = cfg.icon and "" or cfg.name,
 		TextStrokeTransparency = 0.5,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0.3330000042915344, -4, 0, 22),
+		Size = UDim2.new(1, 0, 0, 22),
 		BorderSizePixel = 0,
 		TextSize = 12,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	})
+
+	if cfg.icon then
+		local icon_id = tostring(cfg.icon):gsub("rbxassetid://", "")
+		local tab_icon = library:create("ImageLabel", {
+			Parent = TAB_BUTTON,
+			Name = "Icon",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 6, 0.5, 0),
+			Size = UDim2.new(0, 14, 0, 14),
+			Image = "rbxassetid://" .. icon_id,
+			ImageColor3 = themes.preset.unselected_text,
+			ScaleType = Enum.ScaleType.Fit,
+		})
+		library:apply_theme(tab_icon, "text", "ImageColor3")
+		cfg._tab_icon = tab_icon
+
+		local tab_label = library:create("TextLabel", {
+			Parent = TAB_BUTTON,
+			Name = "Label",
+			FontFace = library.font,
+			TextColor3 = themes.preset.unselected_text,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Text = cfg.name,
+			TextStrokeTransparency = 0.5,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Size = UDim2.new(1, -26, 1, 0),
+			Position = UDim2.new(0, 24, 0, 0),
+			TextSize = 12,
+		})
+		library:apply_theme(tab_label, "text", "TextColor3")
+		cfg._tab_label = tab_label
+	end
 
 	local line = library:create("Frame", {
 		Parent = TAB_BUTTON,
@@ -2563,7 +2712,7 @@ function library:tab(properties)
 
 	library:apply_theme(glow, "accent", "ImageColor3")
 
-	local depth = library:create("Frame", {
+	library:create("Frame", {
 		Parent = line,
 		Name = "",
 		BackgroundTransparency = 0.5,
@@ -2573,7 +2722,6 @@ function library:tab(properties)
 		BorderSizePixel = 0,
 		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 	})
-	--
 
 	-- Tab Instances
 	local TAB = library:create("Frame", {
@@ -2587,109 +2735,64 @@ function library:tab(properties)
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	})
 
-	local scrolling_columns = library:create("Frame", {
-		Parent = TAB,
-		Name = "",
-		ClipsDescendants = true,
-		BorderColor3 = Color3.fromRGB(0, 0, 0),
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 6, 0, 6),
-		Size = UDim2.new(1, -12, 1, -12),
-		BorderSizePixel = 0,
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-	})
+	if cfg.has_subtabs then
+		local sub_bar = library:create("Frame", {
+			Parent = TAB,
+			Name = "SubTabs",
+			BorderColor3 = Color3.fromRGB(8, 8, 8),
+			BackgroundColor3 = Color3.fromRGB(19, 19, 19),
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 6, 0, 6),
+			Size = UDim2.new(1, -12, 0, 40),
+		})
 
-	cfg["column_holder"] = scrolling_columns
+		local sub_inner = library:create("Frame", {
+			Parent = sub_bar,
+			Name = "",
+			Position = UDim2.new(0, 2, 0, 2),
+			Size = UDim2.new(1, -4, 1, -4),
+			BorderColor3 = Color3.fromRGB(56, 56, 56),
+			BackgroundColor3 = Color3.fromRGB(22, 22, 22),
+		})
 
-	local UIListLayout = library:create("UIListLayout", {
-		Parent = scrolling_columns,
-		Name = "",
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalFlex = Enum.UIFlexAlignment.Fill,
-		Padding = UDim.new(0, 5),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	})
+		library:create("UIListLayout", {
+			Parent = sub_inner,
+			Name = "",
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalFlex = Enum.UIFlexAlignment.Fill,
+			Padding = UDim.new(0, 2),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		})
 
-	local left = library:create("ScrollingFrame", {
-		Parent = scrolling_columns,
-		Name = "",
-		ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
-		Active = true,
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 0,
-		Size = UDim2.new(0.5, -64, 1, 0),
-		ClipsDescendants = false,
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 4, 0, 0),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BorderColor3 = Color3.fromRGB(0, 0, 0),
-		BorderSizePixel = 0,
-		CanvasSize = UDim2.new(0, 0, 0, 0),
-	})
+		library:create("UIPadding", {
+			Parent = sub_inner,
+			Name = "",
+			PaddingLeft = UDim.new(0, 2),
+			PaddingRight = UDim.new(0, 2),
+			PaddingTop = UDim.new(0, 2),
+			PaddingBottom = UDim.new(0, 2),
+		})
 
-	left:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-		if library.current_element_open then
-			library.current_element_open.set_visible(false)
-			library.current_element_open.open = false
-			library.current_element_open = nil
-		end
-	end)
+		cfg.subtab_holder = sub_inner
 
-	cfg["left"] = left
-
-	local UIListLayout = library:create("UIListLayout", {
-		Parent = left,
-		Name = "",
-		Padding = UDim.new(0, 6),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	})
-
-	local UIPadding = library:create("UIPadding", {
-		Parent = left,
-		Name = "",
-		PaddingBottom = UDim.new(0, 15),
-	})
-
-	local right = library:create("ScrollingFrame", {
-		Parent = scrolling_columns,
-		Name = "",
-		ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
-		Active = true,
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 0,
-		Size = UDim2.new(0.5, -64, 1, 0),
-		ClipsDescendants = false,
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0.5, -50, 0, 0),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BorderColor3 = Color3.fromRGB(0, 0, 0),
-		BorderSizePixel = 0,
-		CanvasSize = UDim2.new(0, 0, 0, 0),
-	})
-
-	right:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-		if library.current_element_open then
-			library.current_element_open.set_visible(false)
-			library.current_element_open.open = false
-			library.current_element_open = nil
-		end
-	end)
-
-	cfg["right"] = right
-
-	local UIListLayout = library:create("UIListLayout", {
-		Parent = right,
-		Name = "",
-		Padding = UDim.new(0, 6),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	})
-
-	local UIPadding = library:create("UIPadding", {
-		Parent = right,
-		Name = "",
-		PaddingBottom = UDim.new(0, 15),
-	})
-	--
+		local content = library:create("Frame", {
+			Parent = TAB,
+			Name = "SubContent",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 6, 0, 50),
+			Size = UDim2.new(1, -12, 1, -56),
+		})
+		cfg.sub_content = content
+		cfg.column_holder = content
+	else
+		local scrolling_columns, left, right = library_make_columns(TAB)
+		scrolling_columns.Position = UDim2.new(0, 6, 0, 6)
+		scrolling_columns.Size = UDim2.new(1, -12, 1, -12)
+		cfg.column_holder = scrolling_columns
+		cfg.left = left
+		cfg.right = right
+	end
 
 	function cfg.open_tab()
 		if library.current_tab and library.current_tab[1] ~= TAB_BUTTON then
@@ -2697,8 +2800,22 @@ function library:tab(properties)
 			button.TextColor3 = themes.preset.unselected_text
 
 			local parent = button:FindFirstChildOfClass("Frame")
-			parent.BackgroundColor3 = rgb(57, 57, 57)
-			parent:FindFirstChildOfClass("ImageLabel").Visible = false
+			if parent then
+				parent.BackgroundColor3 = rgb(57, 57, 57)
+				local glow_img = parent:FindFirstChildOfClass("ImageLabel")
+				if glow_img then
+					glow_img.Visible = false
+				end
+			end
+
+			local old_icon = button:FindFirstChild("Icon")
+			if old_icon then
+				old_icon.ImageColor3 = themes.preset.unselected_text
+			end
+			local old_label = button:FindFirstChild("Label")
+			if old_label then
+				old_label.TextColor3 = themes.preset.unselected_text
+			end
 
 			library.current_tab[2].Visible = false
 		end
@@ -2712,15 +2829,160 @@ function library:tab(properties)
 		glow.Visible = true
 		TAB_BUTTON.TextColor3 = themes.preset.text
 		TAB.Visible = true
+		if cfg._tab_icon then
+			cfg._tab_icon.ImageColor3 = themes.preset.accent
+		end
+		if cfg._tab_label then
+			cfg._tab_label.TextColor3 = themes.preset.text
+		end
 
 		if library.current_element_open and library.current_element_open ~= cfg then
 			library.current_element_open.set_visible(false)
 			library.current_element_open.open = false
 			library.current_element_open = nil
 		end
+
+		if cfg.current_subtab and cfg.current_subtab.open_subtab then
+			cfg.current_subtab.open_subtab()
+		end
 	end
 
 	TAB_BUTTON.MouseButton1Click:Connect(cfg.open_tab)
+
+	return setmetatable(cfg, library)
+end
+
+function library:subtab(properties)
+	local parent_tab = self
+	if not parent_tab.has_subtabs or not parent_tab.subtab_holder then
+		error("[library] subtab requires tab({ subtabs = true })")
+	end
+
+	local cfg = {
+		name = properties.name or properties.Name or "Sub",
+		icon = properties.icon or properties.Icon or "6031280882",
+		parent_tab = parent_tab,
+		active = false,
+	}
+
+	local icon_id = tostring(cfg.icon):gsub("rbxassetid://", "")
+
+	local button = library:create("TextButton", {
+		Parent = parent_tab.subtab_holder,
+		Name = "",
+		Text = "",
+		AutoButtonColor = false,
+		BorderColor3 = Color3.fromRGB(10, 10, 10),
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(28, 28, 28),
+	})
+	library:apply_theme(button, "outline", "BackgroundColor3")
+
+	local icon = library:create("ImageLabel", {
+		Parent = button,
+		Name = "Icon",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, -4),
+		Size = UDim2.new(0, 18, 0, 18),
+		Image = "rbxassetid://" .. icon_id,
+		ImageColor3 = themes.preset.unselected_text,
+		ImageTransparency = 0.25,
+		ScaleType = Enum.ScaleType.Fit,
+	})
+
+	local label = library:create("TextLabel", {
+		Parent = button,
+		Name = "Label",
+		FontFace = library.font,
+		Text = cfg.name,
+		TextColor3 = themes.preset.unselected_text,
+		TextTransparency = 0.25,
+		TextStrokeTransparency = 0.5,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -2),
+		Size = UDim2.new(1, -4, 0, 10),
+		TextSize = 10,
+	})
+
+	local underline = library:create("Frame", {
+		Parent = button,
+		Name = "Line",
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(1, 0, 0, 2),
+		BackgroundColor3 = themes.preset.accent,
+		Visible = false,
+	})
+	library:apply_theme(underline, "accent", "BackgroundColor3")
+
+	local page = library:create("Frame", {
+		Parent = parent_tab.sub_content,
+		Name = "",
+		Visible = false,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0),
+	})
+
+	local _, left, right = library_make_columns(page)
+	cfg.left = left
+	cfg.right = right
+	cfg.page = page
+	cfg.button = button
+
+	function cfg.open_subtab()
+		for _, other in next, parent_tab.subtabs do
+			other.active = false
+			other.page.Visible = false
+			other.button.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+			local o_icon = other.button:FindFirstChild("Icon")
+			local o_label = other.button:FindFirstChild("Label")
+			local o_line = other.button:FindFirstChild("Line")
+			if o_icon then
+				o_icon.ImageColor3 = themes.preset.unselected_text
+				o_icon.ImageTransparency = 0.25
+			end
+			if o_label then
+				o_label.TextColor3 = themes.preset.unselected_text
+				o_label.TextTransparency = 0.25
+			end
+			if o_line then
+				o_line.Visible = false
+			end
+		end
+
+		cfg.active = true
+		page.Visible = true
+		underline.Visible = true
+		underline.BackgroundColor3 = themes.preset.accent
+		button.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+		icon.ImageColor3 = themes.preset.accent
+		icon.ImageTransparency = 0
+		label.TextColor3 = themes.preset.text
+		label.TextTransparency = 0
+		parent_tab.current_subtab = cfg
+		parent_tab.left = cfg.left
+		parent_tab.right = cfg.right
+
+		if library.current_element_open then
+			library.current_element_open.set_visible(false)
+			library.current_element_open.open = false
+			library.current_element_open = nil
+		end
+	end
+
+	button.MouseButton1Click:Connect(cfg.open_subtab)
+
+	table.insert(parent_tab.subtabs, cfg)
+	if #parent_tab.subtabs == 1 then
+		cfg.open_subtab()
+	end
 
 	return setmetatable(cfg, library)
 end
