@@ -881,7 +881,22 @@ local Library do
         end
     end
 
+    local function HasNoFadeAncestor(Item)
+        local Current = Item
+        while Current do
+            if Current:GetAttribute("haze_nofade") then
+                return true
+            end
+            Current = Current.Parent
+        end
+        return false
+    end
+
     Library.FadeItem = function(self, Item, Property, Visibility, Speed)
+        if HasNoFadeAncestor(Item) then
+            return nil
+        end
+
         local OldTransparency = Item[Property]
         Item[Property] = Visibility and 1 or OldTransparency
 
@@ -1405,6 +1420,18 @@ local Library do
         for _, Callback in self.ThemeHooks do
             pcall(Callback, Key)
         end
+    end
+
+    -- UI chrome style: "Default" (boxed icon subtabs) or "Lined" (text + accent underline).
+    -- Scripts may listen via ThemeHooks / their own ApplyUIStyle; this stores the choice.
+    Library.UIStyle = Library.UIStyle or "Default"
+    Library.SetUIStyle = function(self, Style)
+        if Style ~= "Lined" then
+            Style = "Default"
+        end
+        self.UIStyle = Style
+        self:FireThemeHooks("UIStyle")
+        return Style
     end
 
     Library.ResolveThemeColor = function(self, Value)
@@ -3335,7 +3362,7 @@ local Library do
                                 if Hide then
                                     Hide.Visible = true
                                 end
-                                if Inactive thenA
+                                if Inactive then
                                     Inactive.Size = UDim2New(1, 0, 1, 1)
                                 end
                             else
@@ -3557,7 +3584,8 @@ local Library do
                     Size = UDim2New(1, -14, 0, 35),
                     BorderSizePixel = 0,
                     BackgroundColor3 = FromRGB(255, 255, 255)
-                }) 
+                })
+                Items["SubTabs"].Instance:SetAttribute("haze_nofade", true)
 
                 Instances:Create("UIListLayout", {
                     Parent = Items["SubTabs"].Instance,
