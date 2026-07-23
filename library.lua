@@ -253,10 +253,10 @@ local Library do
         },
 
         Folders = {
-            Directory = "scriptname",
-            Configs = "scriptname/Configs",
-            Assets = "scriptname/Assets",
-            Themes = "scriptname/Themes",
+            Directory = "haze.best",
+            Configs = "haze.best/Configs",
+            Assets = "haze.best/Assets",
+            Themes = "haze.best/Themes",
         },
 
         ThemeKeys = {
@@ -854,10 +854,32 @@ local Library do
         local ImageData = self.Images[Image]
 
         if not ImageData then 
-            return
+            return ""
         end
 
-        return getcustomasset(self.Folders.Assets .. "/" .. ImageData[1])
+        local Path = self.Folders.Assets .. "/" .. ImageData[1]
+        if isfile and isfile(Path) then
+            local Ok, Asset = pcall(getcustomasset, Path)
+            if Ok and Asset then
+                return Asset
+            end
+        end
+
+        -- last resort: download then retry
+        if ImageData[2] and writefile then
+            pcall(function()
+                if makefolder and not isfolder(self.Folders.Assets) then
+                    makefolder(self.Folders.Assets)
+                end
+                writefile(Path, game:HttpGet(ImageData[2]))
+            end)
+            local Ok, Asset = pcall(getcustomasset, Path)
+            if Ok and Asset then
+                return Asset
+            end
+        end
+
+        return ""
     end
 
     Library.Round = function(self, Number, Float)
