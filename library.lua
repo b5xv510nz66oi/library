@@ -237,7 +237,7 @@ local Library do
             ["Page Background"] = FromHex("#28201e"),
             ["Border"] = FromHex("#120f0e"),
             ["Outline"] = FromHex("#211c1b"),
-            ["Accent"] = FromHex("#ffb29d"),
+            ["Accent"] = FromHex("#7dd3fc"),
             ["Element"] = FromHex("#242221"),
             ["Hovered Element"] = FromHex("#322f2f"),
             ["Text"] = FromHex("#979797"),
@@ -1148,7 +1148,11 @@ local Library do
         end
 
         self.ThemeMap[Item].Properties = Properties
-        self.ThemeMap[Item] = self.ThemeMap[Item]
+        for Property, Value in Properties do
+            if type(Value) == "string" and self.Theme[Value] then
+                Item[Property] = self.Theme[Value]
+            end
+        end
     end
 
     Library.ChangeTheme = function(self, Theme, Color)
@@ -1716,6 +1720,8 @@ local Library do
                 end
             })
         end
+
+        self:ApplyTheme(Default, true)
     end
 
     Library.IsMouseOverFrame = function(self, Frame)
