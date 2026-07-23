@@ -1,4 +1,4 @@
-﻿local uis = game:GetService("UserInputService")
+local uis = game:GetService("UserInputService")
 local players = game:GetService("Players")
 local ws = game:GetService("Workspace")
 local http_service = game:GetService("HttpService")
