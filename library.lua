@@ -62,7 +62,7 @@ getgenv().library = {
 		"/configs",
 	},
 	font,
-	rev = 5, -- bump when loader must invalidate stale executor cache
+	rev = 6, -- bump when loader must invalidate stale executor cache
 }
 
 local flags = library.flags
