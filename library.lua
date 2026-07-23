@@ -1,4 +1,4 @@
-local uis = game:GetService("UserInputService")
+﻿local uis = game:GetService("UserInputService")
 local players = game:GetService("Players")
 local ws = game:GetService("Workspace")
 local http_service = game:GetService("HttpService")
@@ -62,7 +62,7 @@ getgenv().library = {
 		"/configs",
 	},
 	font,
-	rev = 4, -- bump when loader must invalidate stale executor cache
+	rev = 5, -- bump when loader must invalidate stale executor cache
 }
 
 local flags = library.flags
@@ -446,7 +446,7 @@ function library:window(properties)
 	}
 
 	local animated_text = library:animation(cfg.name .. " | private")
-	-- nested chrome eats ~50px; pixel font ~7px/char — keep text inside the inner outline
+	-- nested chrome eats ~50px; pixel font ~7px/char ΓÇö keep text inside the inner outline
 	local function watermark_need(text)
 		return math.max(140, (#tostring(text) * 7) + 56)
 	end
@@ -2543,7 +2543,6 @@ local function library_make_columns(parent)
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 1, 0),
 		BorderSizePixel = 0,
-		ZIndex = 1,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	})
 
@@ -2737,7 +2736,7 @@ function library:tab(properties)
 		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 	})
 
-	-- Tab Instances (ZIndex above emblem host)
+	-- Tab Instances
 	local TAB = library:create("Frame", {
 		Parent = self.tab_instance_holder,
 		Name = "",
@@ -2746,7 +2745,6 @@ function library:tab(properties)
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 1, 0),
 		BorderSizePixel = 0,
-		ZIndex = 1,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	})
 
@@ -2942,7 +2940,6 @@ function library:subtab(properties)
 		Visible = false,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ZIndex = 1,
 		Size = UDim2.new(1, 0, 1, 0),
 	})
 
@@ -5793,40 +5790,29 @@ function library:create_emblem(Window, Options)
         },
     }
 
-    -- sit inside the menu content (behind sections), never over the UI chrome
-    local ContentHost = Window and Window.tab_instance_holder or nil
-    local OldEmblem = ContentHost and ContentHost:FindFirstChild(GuiName)
+    local OldEmblem = Hui:FindFirstChild(GuiName)
     if OldEmblem then
         OldEmblem:Destroy()
     end
+
+    local EmblemGui = Instance.new("ScreenGui")
+    EmblemGui.Name = GuiName
+    EmblemGui.IgnoreGuiInset = true
+    EmblemGui.DisplayOrder = -100
+    EmblemGui.ResetOnSpawn = false
+    EmblemGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    EmblemGui.Parent = Hui
+
     pcall(function()
-        local Stale = Hui:FindFirstChild(GuiName)
-        if Stale then
-            Stale:Destroy()
-        end
         if library.gui then
             library.gui.DisplayOrder = math.max(library.gui.DisplayOrder or 0, 50)
-            local GuiStale = library.gui:FindFirstChild(GuiName)
-            if GuiStale then
-                GuiStale:Destroy()
-            end
         end
     end)
-
-    local EmblemHost = Instance.new("Frame")
-    EmblemHost.Name = GuiName
-    EmblemHost.BackgroundTransparency = 1
-    EmblemHost.BorderSizePixel = 0
-    EmblemHost.Size = UDim2.new(1, 0, 1, 0)
-    EmblemHost.Position = UDim2.new(0, 0, 0, 0)
-    EmblemHost.ZIndex = 0
-    EmblemHost.Active = false
-    EmblemHost.Parent = ContentHost or library.gui
 
     local Viewport = Instance.new("ViewportFrame")
     Viewport.Name = "EmblemViewport"
     Viewport.BackgroundTransparency = 1
-    Viewport.Size = UDim2.new(0, 420, 0, 420)
+    Viewport.Size = UDim2.new(0, 640, 0, 640)
     Viewport.AnchorPoint = Vector2.new(0.5, 0.5)
     Viewport.Position = UDim2.new(0.5, 0, 0.5, 0)
     Viewport.Ambient = Color3.fromRGB(70, 72, 80)
@@ -5834,8 +5820,7 @@ function library:create_emblem(Window, Options)
     Viewport.LightDirection = Vector3.new(-0.55, -1, -0.35)
     Viewport.ImageTransparency = 0
     Viewport.Active = false
-    Viewport.ZIndex = 0
-    Viewport.Parent = EmblemHost
+    Viewport.Parent = EmblemGui
 
     local World = Instance.new("WorldModel")
     World.Parent = Viewport
@@ -6333,13 +6318,7 @@ function library:create_emblem(Window, Options)
 
     local function UpdateEmblem()
         local Show = EmblemEnabled and Window.IsOpen and not IsUnloaded()
-        EmblemHost.Visible = Show
-        -- keep behind whatever tab/subtab content is open
-        if ContentHost and EmblemHost.Parent ~= ContentHost then
-            EmblemHost.Parent = ContentHost
-        end
-        EmblemHost.ZIndex = 0
-        Viewport.ZIndex = 0
+        EmblemGui.Enabled = Show
         ApplyEmblemVisibility()
     end
 
@@ -6481,7 +6460,7 @@ function library:create_emblem(Window, Options)
             EmblemConnection:Disconnect()
         end)
         pcall(function()
-            EmblemHost:Destroy()
+            EmblemGui:Destroy()
         end)
     end
 
@@ -6490,7 +6469,7 @@ function library:create_emblem(Window, Options)
 end
 
 -- ============================================================================
--- ESP preview (3D frame outside the menu — styled like a standalone ESP PREVIEW panel)
+-- ESP preview (3D frame outside the menu ΓÇö styled like a standalone ESP PREVIEW panel)
 -- Includes character bundle models + catalog dance/emote playback.
 -- ============================================================================
 
@@ -6548,7 +6527,7 @@ function library:create_esp_preview(Window, Options)
 
     local EspPreviewConnection
 
-    -- cleanup previous preview (old ScreenGui + panel on library holder)
+    -- cleanup previous preview (own ScreenGui + leftover panel on library holder)
     local OldEsp = Hui:FindFirstChild(GuiName)
     if OldEsp then
         OldEsp:Destroy()
@@ -6556,131 +6535,56 @@ function library:create_esp_preview(Window, Options)
     pcall(function()
         local Holder = library.gui
         if Holder then
-            Holder.DisplayOrder = math.max(Holder.DisplayOrder or 0, 50)
-            local Leftover = Holder:FindFirstChild(GuiName)
+            local Leftover = Holder:FindFirstChild("EspPreviewPanel")
             if Leftover then
                 Leftover:Destroy()
-            end
-            local LeftoverPanel = Holder:FindFirstChild("EspPreviewPanel", true)
-            if LeftoverPanel then
-                LeftoverPanel:Destroy()
             end
         end
     end)
 
-    local PanelW, PanelH = 260, 610
+    local EspGui = Instance.new("ScreenGui")
+    EspGui.Name = GuiName
+    EspGui.IgnoreGuiInset = false
+    EspGui.DisplayOrder = 120
+    EspGui.ResetOnSpawn = false
+    EspGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    EspGui.Enabled = false
+    EspGui.Parent = Hui
+
+    pcall(function()
+        local Holder = library.gui
+        if Holder then
+            EspGui.IgnoreGuiInset = Holder.IgnoreGuiInset
+            Holder.DisplayOrder = math.max(Holder.DisplayOrder or 0, 50)
+            local Leftover = Holder:FindFirstChild("EspPreviewPanel", true)
+            if Leftover then
+                Leftover:Destroy()
+            end
+        end
+    end)
+
+    local PanelW, PanelH = 300, 400
     local PartLooks = {}
-    local EspDockOffsetX = 0
-    local EspDockOffsetY = 0
+    local EspDockOffsetX = 6
+    local EspDockOffsetY = -1
     local EspDraggingPanel = false
     local EspDraggingOrbit = false
     local EspDragStart
     local EspPanelStart
     local EspOrbitLast
 
-    -- same ScreenGui as main menu so chrome / layering match
-    local EspHost = library.gui
     local Panel = Instance.new("Frame")
-    Panel.Name = GuiName
+    Panel.Name = "EspPreviewPanel"
     Panel.AnchorPoint = Vector2.new(0, 0)
     Panel.Position = UDim2.fromOffset(24, 120)
     Panel.Size = UDim2.fromOffset(PanelW, PanelH)
-    Panel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Panel.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     Panel.BackgroundTransparency = 0
-    Panel.BorderSizePixel = 1
-    Panel.BorderColor3 = Color3.fromRGB(8, 8, 8)
+    Panel.BorderSizePixel = 0
     Panel.Active = true
-    Panel.Visible = false
+    Panel.Visible = true
     Panel.ClipsDescendants = true
-    Panel.ZIndex = 2
-    Panel.Parent = EspHost
-
-    local Accent = Instance.new("Frame")
-    Accent.Name = "Accent"
-    Accent.Size = UDim2.new(1, 0, 0, 2)
-    Accent.BorderSizePixel = 0
-    Accent.BackgroundColor3 = themes.preset.accent
-    Accent.ZIndex = 5
-    Accent.Parent = Panel
-    library:apply_theme(Accent, "accent", "BackgroundColor3")
-
-    local AccentDepth = Instance.new("Frame")
-    AccentDepth.BackgroundTransparency = 0.5
-    AccentDepth.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    AccentDepth.BorderSizePixel = 0
-    AccentDepth.Position = UDim2.new(0, 0, 0, 1)
-    AccentDepth.Size = UDim2.new(1, 0, 0, 1)
-    AccentDepth.ZIndex = 6
-    AccentDepth.Parent = Panel
-
-    local Inline2 = Instance.new("Frame")
-    Inline2.Name = "Inline"
-    Inline2.Position = UDim2.new(0, 2, 0, 2)
-    Inline2.Size = UDim2.new(1, -4, 1, -4)
-    Inline2.BorderSizePixel = 0
-    Inline2.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-    Inline2.ZIndex = 3
-    Inline2.Parent = Panel
-
-    local MainInner = Instance.new("Frame")
-    MainInner.Name = "Main"
-    MainInner.Position = UDim2.new(0, 2, 0, 2)
-    MainInner.Size = UDim2.new(1, -4, 1, -4)
-    MainInner.BorderSizePixel = 1
-    MainInner.BorderColor3 = Color3.fromRGB(57, 57, 57)
-    MainInner.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-    MainInner.ZIndex = 3
-    MainInner.Parent = Inline2
-
-    local Header = Instance.new("TextButton")
-    Header.Name = "Header"
-    Header.BackgroundTransparency = 1
-    Header.Position = UDim2.new(0, 0, 0, 0)
-    Header.Size = UDim2.new(1, 0, 0, 22)
-    Header.Text = ""
-    Header.AutoButtonColor = false
-    Header.Active = true
-    Header.ZIndex = 4
-    Header.Parent = MainInner
-
-    local Title = Instance.new("TextLabel")
-    Title.BackgroundTransparency = 1
-    Title.Position = UDim2.fromOffset(8, 3)
-    Title.Size = UDim2.new(1, -16, 0, 16)
-    Title.FontFace = library.font
-    Title.TextSize = 12
-    Title.TextStrokeTransparency = 0.5
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.TextColor3 = themes.preset.text
-    Title.Text = "ESP Preview"
-    Title.Active = false
-    Title.ZIndex = 5
-    Title.Parent = Header
-    library:apply_theme(Title, "text", "TextColor3")
-
-    local ContentInline = Instance.new("Frame")
-    ContentInline.Name = "ContentInline"
-    ContentInline.Position = UDim2.new(0, 6, 0, 22)
-    ContentInline.Size = UDim2.new(1, -12, 1, -28)
-    ContentInline.BorderSizePixel = 0
-    ContentInline.BackgroundColor3 = Color3.fromRGB(19, 19, 19)
-    ContentInline.ZIndex = 3
-    ContentInline.Parent = MainInner
-
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Position = UDim2.new(0, 2, 0, 2)
-    Content.Size = UDim2.new(1, -4, 1, -4)
-    Content.BorderSizePixel = 1
-    Content.BorderColor3 = Color3.fromRGB(56, 56, 56)
-    Content.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-    Content.ClipsDescendants = true
-    Content.ZIndex = 3
-    Content.Parent = ContentInline
-
-    local PanelStroke = Instance.new("UIStroke")
-    PanelStroke.Enabled = false
-    PanelStroke.Parent = Panel
+    Panel.Parent = EspGui
 
     local function GetMainWindowFrame()
         local Main = Window._main_frame or (library.main_frame and library.main_frame[1])
@@ -6700,25 +6604,23 @@ function library:create_esp_preview(Window, Options)
             return
         end
 
-        if Panel.Parent ~= EspHost then
-            Panel.Parent = EspHost
+        if Panel.Parent ~= EspGui then
+            Panel.Parent = EspGui
         end
 
         if Main.AbsoluteSize.X < 50 then
             return
         end
 
-        PanelH = math.max(280, math.floor(Main.AbsoluteSize.Y + 0.5))
-        PanelW = 260
-
         local Screen = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
-        local Gap = EspDockOffsetX
+        local Gap = math.abs(EspDockOffsetX)
         local PlaceRight = Main.AbsolutePosition.X + Main.AbsoluteSize.X + Gap + PanelW <= Screen.X - 6
 
         local TargetX
         if PlaceRight then
             TargetX = Main.AbsolutePosition.X + Main.AbsoluteSize.X + Gap
         else
+            -- keep same gap on the left so it doesn't tuck into the main UI
             TargetX = Main.AbsolutePosition.X - PanelW - Gap
         end
         local TargetY = Main.AbsolutePosition.Y + EspDockOffsetY
@@ -6744,11 +6646,69 @@ function library:create_esp_preview(Window, Options)
     task.delay(0.2, AlignEspToWindow)
     task.delay(0.5, AlignEspToWindow)
 
-    local ViewportHolder = Content
+    local PanelStroke = Instance.new("UIStroke")
+    PanelStroke.Thickness = 0.5
+    PanelStroke.Color = themes.preset.outline or Color3.fromRGB(57, 57, 57)
+    PanelStroke.Parent = Panel
+
+    local Accent = Instance.new("Frame")
+    Accent.Name = "Accent"
+    Accent.Size = UDim2.new(1, 0, 0, 1)
+    Accent.BorderSizePixel = 0
+    Accent.BackgroundColor3 = themes.preset.accent
+    Accent.ZIndex = 32
+    Accent.Parent = Panel
+
+    local Header = Instance.new("TextButton")
+    Header.Name = "Header"
+    Header.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    Header.BackgroundTransparency = 0
+    Header.Position = UDim2.new(0, 0, 0, 1)
+    Header.Size = UDim2.new(1, 0, 0, 24)
+    Header.Text = ""
+    Header.AutoButtonColor = false
+    Header.Active = true
+    Header.ZIndex = 30
+    Header.Parent = Panel
+
+    local HeaderLine = Instance.new("Frame")
+    HeaderLine.Name = "HeaderLine"
+    HeaderLine.AnchorPoint = Vector2.new(0, 1)
+    HeaderLine.Position = UDim2.new(0, 0, 1, 0)
+    HeaderLine.Size = UDim2.new(1, 0, 0, 1)
+    HeaderLine.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+    HeaderLine.BorderSizePixel = 0
+    HeaderLine.ZIndex = 31
+    HeaderLine.Parent = Header
+
+    local Title = Instance.new("TextLabel")
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.fromOffset(10, 4)
+    Title.Size = UDim2.new(1, -20, 0, 14)
+    Title.Font = Enum.Font.Code
+    Title.TextSize = 11
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.TextColor3 = Color3.fromRGB(210, 210, 218)
+    Title.TextTransparency = 0
+    Title.Text = "ESP PREVIEW"
+    Title.Active = false
+    Title.ZIndex = 31
+    Title.Parent = Header
+
+    -- Full-bleed viewport under header (no nested card)
+    local ViewportHolder = Instance.new("Frame")
+    ViewportHolder.Name = "ViewportHolder"
+    ViewportHolder.Position = UDim2.new(0, 0, 0, 25)
+    ViewportHolder.Size = UDim2.new(1, 0, 1, -25)
+    ViewportHolder.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    ViewportHolder.BorderSizePixel = 0
+    ViewportHolder.ClipsDescendants = true
+    ViewportHolder.Active = true
+    ViewportHolder.Parent = Panel
 
     local EspViewport = Instance.new("ViewportFrame")
     EspViewport.Name = "EspViewport"
-    EspViewport.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    EspViewport.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
     EspViewport.BackgroundTransparency = 0
     EspViewport.ImageTransparency = 0
     EspViewport.Size = UDim2.new(1, 0, 1, 0)
@@ -6756,7 +6716,6 @@ function library:create_esp_preview(Window, Options)
     EspViewport.LightColor = Color3.fromRGB(255, 255, 255)
     EspViewport.LightDirection = Vector3.new(-0.45, -1, -0.65)
     EspViewport.Active = true
-    EspViewport.ZIndex = 4
     EspViewport.Parent = ViewportHolder
 
     local EspWorld = Instance.new("WorldModel")
@@ -7213,7 +7172,7 @@ function library:create_esp_preview(Window, Options)
 
     local function CreateAppearanceModel(PreferR15)
         -- Prefer catalog avatar from UserId. Games like Animal Hospital wipe
-        -- GetAppliedDescription() (all 0s) → grey dummy, and nest a custom
+        -- GetAppliedDescription() (all 0s) ΓåÆ grey dummy, and nest a custom
         -- CharacterModel (bunny) that cannot play catalog emotes.
         local Desc
         local OkUser, FromUser = pcall(function()
@@ -7268,7 +7227,7 @@ function library:create_esp_preview(Window, Options)
 
     local EspDances = {
         ["None"] = nil,
-        -- catalog emote id → real AnimationId (GetObjects)
+        -- catalog emote id ΓåÆ real AnimationId (GetObjects)
         ["Jamal Brazil"] = {
             Catalog = 104131847054135,
             Animation = 83796130837213,
@@ -7840,8 +7799,8 @@ function library:create_esp_preview(Window, Options)
 
     local HealthGradient = Instance.new("UIGradient")
     HealthGradient.Name = "HealthGradient"
-    HealthGradient.Rotation = 90 -- top → bottom
-    -- classic ESP degradado (green → yellow → red)
+    HealthGradient.Rotation = 90 -- top ΓåÆ bottom
+    -- classic ESP degradado (green ΓåÆ yellow ΓåÆ red)
     HealthGradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 0)),
@@ -7864,7 +7823,7 @@ function library:create_esp_preview(Window, Options)
     DistanceTag.ZIndex = 7
     DistanceTag.Parent = Box
 
-    -- healthbar only: bottom → top fill loop + fixed gradient reveal
+    -- healthbar only: bottom ΓåÆ top fill loop + fixed gradient reveal
     local EspAnimClock = 0
 
     local function AnyEspOverlay()
@@ -7882,7 +7841,7 @@ function library:create_esp_preview(Window, Options)
     end
 
     local function AutoHealthAmount(Clock)
-        -- fill bottom→top, hold, drain, repeat
+        -- fill bottomΓåÆtop, hold, drain, repeat
         local Cycle = Clock % 3.2
         local Amount
         if Cycle < 1.35 then
@@ -7964,7 +7923,7 @@ function library:create_esp_preview(Window, Options)
     end)
 
     UserInputService.InputChanged:Connect(function(Input)
-        if IsUnloaded() or not Panel.Visible then
+        if IsUnloaded() or not EspGui.Enabled then
             return
         end
 
@@ -8147,7 +8106,7 @@ function library:create_esp_preview(Window, Options)
 
     UpdateEspPreview = function()
         local Show = Window.IsOpen and not IsUnloaded()
-        Panel.Visible = Show and true or false
+        EspGui.Enabled = Show and true or false
         AlignEspToWindow()
         Panel.BackgroundTransparency = 0
         if not EnsureViewportWorld() then
@@ -8172,7 +8131,7 @@ function library:create_esp_preview(Window, Options)
 
         UpdateEspPreview()
 
-        if not Panel.Visible then
+        if not EspGui.Enabled then
             return
         end
 
@@ -8301,13 +8260,13 @@ function library:create_esp_preview(Window, Options)
         end)
 
         pcall(function()
-            Panel:Destroy()
+            EspGui:Destroy()
         end)
 
         pcall(function()
             local Holder = library.gui
             if Holder then
-                local Panel2 = Holder:FindFirstChild(GuiName, true)
+                local Panel2 = Holder:FindFirstChild("EspPreviewPanel", true)
                 if Panel2 then
                     Panel2:Destroy()
                 end
