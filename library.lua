@@ -1,4 +1,14 @@
 --[[
+    haze.best — single-file UI (Tauri look, no HttpGet)
+]]
+
+if getgenv().HazeUI then
+    pcall(function()
+        getgenv().HazeUI:Unload()
+    end)
+end
+
+--[[
     haze.ui — from-scratch Roblox UI matching the haze.best Tauri menu
     No Thugsense. Colors/layout from src/styles.css
 ]]
@@ -8,16 +18,33 @@ local TS = game:GetService("TweenService")
 local RS = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
-local function Hui()
-    return (gethui and gethui()) or game:GetService("CoreGui")
+local function ParentGui(gui)
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(gui)
+        end
+        if protect_gui then
+            protect_gui(gui)
+        end
+    end)
+    local ok = pcall(function()
+        if gethui then
+            gui.Parent = gethui()
+        else
+            gui.Parent = game:GetService("CoreGui")
+        end
+    end)
+    if not ok or not gui.Parent then
+        local pg = LocalPlayer:WaitForChild("PlayerGui", 5)
+        gui.Parent = pg
+    end
 end
 
 local Theme = {
-    Accent = Color3.fromHex("8e84ff"),
+    Accent = Color3.fromRGB(142, 132, 255),
     Shell = Color3.fromRGB(8, 8, 14),
     Content = Color3.fromRGB(12, 12, 18),
     Panel = Color3.fromRGB(16, 16, 24),
@@ -25,8 +52,8 @@ local Theme = {
     Element = Color3.fromRGB(21, 21, 29),
     ElementActive = Color3.fromRGB(37, 36, 53),
     KnobOff = Color3.fromRGB(41, 41, 53),
-    Text = Color3.fromRGB(49, 49, 61),
-    TextHov = Color3.fromRGB(104, 104, 120),
+    Text = Color3.fromRGB(104, 104, 120),
+    TextHov = Color3.fromRGB(160, 160, 176),
     TextActive = Color3.fromRGB(255, 255, 255),
     Border = Color3.fromRGB(40, 38, 58),
 }
@@ -42,7 +69,7 @@ local Library = {
 
 local function New(class, props)
     local i = Instance.new(class)
-    for k, v in props do
+    for k, v in pairs(props) do
         if k ~= "Parent" then
             i[k] = v
         end
@@ -114,14 +141,32 @@ end
 --------------------------------------------------------------------
 -- ScreenGui
 --------------------------------------------------------------------
+pcall(function()
+    local root = gethui and gethui() or game:GetService("CoreGui")
+    local old = root:FindFirstChild("haze_best_ui")
+    if old then
+        old:Destroy()
+    end
+end)
+pcall(function()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local old = pg:FindFirstChild("haze_best_ui")
+        if old then
+            old:Destroy()
+        end
+    end
+end)
+
 local Gui = New("ScreenGui", {
     Name = "haze_best_ui",
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    DisplayOrder = 100,
+    DisplayOrder = 999,
     IgnoreGuiInset = true,
-    Parent = Hui(),
 })
+ParentGui(Gui)
+print("[haze.ui] ScreenGui ->", Gui.Parent and Gui.Parent:GetFullName() or "nil")
 
 local Holder = New("Frame", {
     Name = "Holder",
@@ -276,7 +321,7 @@ function Library:Window(Opts)
             math.floor(Camera.ViewportSize.Y / 2 - H / 2)
         ),
         BackgroundColor3 = Theme.Shell,
-        BackgroundTransparency = 0.08,
+        BackgroundTransparency = 0.02,
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Parent = Holder,
@@ -1029,4 +1074,172 @@ function Library:Unload()
 end
 
 getgenv().HazeUI = Library
-return Library
+
+
+local UI = Library
+local t0 = os.clock()
+
+local Watermark = UI:Watermark({ "haze.best", "Server", "144FPS", "64PING", os.date("%I:%M %p") })
+task.spawn(function()
+    while not UI.Unloaded do
+        pcall(function()
+            Watermark:SetItems({ "haze.best", "Server", "144FPS", "64PING", os.date("%I:%M %p") })
+        end)
+        task.wait(1)
+    end
+end)
+
+local Window = UI:Window({ Width = 840, Height = 630 })
+print("[haze.best] window ok", Window.Menu and Window.Menu.Visible)
+
+local Aim = Window:Page({ Name = "Aim", Columns = 2 })
+
+do
+    local P = Aim:Panel(1)
+    P:Toggle({
+        Name = "Enable ragebot",
+        Flag = "ragebot",
+        Default = true,
+        Keybind = Enum.KeyCode.E,
+        Callback = function(v)
+            if v then
+                UI:Notify("You have successfully summoned a notification!", 4)
+            end
+        end,
+    })
+    P:Sep()
+    P:Toggle({ Name = "Silent aimbot", Flag = "silent", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "Hit chance", Flag = "hit_chance_toggle", Default = false })
+    P:Sep()
+    P:Slider({ Name = "Field of view", Flag = "fov", Min = -180, Max = 180, Default = 90, Suffix = "°", Decimals = 0 })
+end
+
+do
+    local P = Aim:Panel(1)
+    P:Dropdown({ Name = "Body aimbot", Flag = "body", Items = { "Default", "Body" }, Default = "Default" })
+    P:Dropdown({ Name = "Safe points", Flag = "safe", Items = { "On limbs", "None" }, Default = "On limbs" })
+end
+
+do
+    local P = Aim:Panel(1)
+    P:Toggle({ Name = "Enable recoil", Flag = "recoil", Default = true, Keybind = Enum.KeyCode.R })
+    P:Sep()
+    P:Slider({ Name = "Smoothness", Flag = "smooth", Min = 0, Max = 100, Default = 50, Suffix = "%", Decimals = 0 })
+end
+
+do
+    local P = Aim:Panel(2)
+    P:Slider({ Name = "Hit chance", Flag = "hit_chance", Min = 0, Max = 100, Default = 10, Suffix = "%", Decimals = 0 })
+    P:Sep()
+    P:Slider({ Name = "Max misses", Flag = "max_misses", Min = 0, Max = 100, Default = 50, Suffix = "%", Decimals = 0 })
+    P:Sep()
+    P:Toggle({ Name = "Static point scale", Flag = "point_scale", Default = true, Keybind = Enum.KeyCode.X })
+    P:Sep()
+    P:Toggle({ Name = "Head safety if lethal", Flag = "head_safety", Default = true })
+end
+
+do
+    local P = Aim:Panel(2)
+    P:Toggle({ Name = "Enable triggerbot", Flag = "trigger", Default = true, Keybind = Enum.KeyCode.T })
+    P:Sep()
+    P:Toggle({ Name = "Enable trigger in smoke", Flag = "trigger_smoke", Default = false })
+    P:Sep()
+    P:Button({
+        Name = "Button",
+        Callback = function()
+            UI:Notify("Button pressed", 2)
+        end,
+    })
+end
+
+do
+    local P = Aim:Panel(2)
+    P:Slider({ Name = "Pitch", Flag = "pitch", Min = 0, Max = 1, Default = 0.5, Decimals = 3 })
+    P:Sep()
+    P:Slider({ Name = "Yaw", Flag = "yaw", Min = 0, Max = 1, Default = 0.5, Decimals = 3 })
+    P:Sep()
+    P:Toggle({ Name = "Static point scale", Flag = "aim_point_scale", Default = false, Keybind = Enum.KeyCode.C })
+    P:Sep()
+    P:Toggle({ Name = "Head safety if lethal", Flag = "aim_head_safety", Default = false })
+end
+
+Window:Page({ Name = "Move", Columns = 2 })
+Window:Page({ Name = "Misc", Columns = 2 })
+
+local Visuals = Window:Page({ Name = "Visuals", Columns = 2 })
+do
+    local P = Visuals:Panel(1)
+    P:Toggle({ Name = "Enable ESP", Flag = "esp", Default = true, Keybind = Enum.KeyCode.F })
+    P:Sep()
+    P:Toggle({ Name = "Through walls", Flag = "esp_walls", Default = true })
+    P:Sep()
+    P:Dropdown({ Name = "Dynamic tracer", Flag = "esp_tracer", Items = { "Disabled", "In the field" }, Default = "Disabled" })
+    P:Sep()
+    P:Toggle({ Name = "Dynamic boxes", Flag = "esp_boxes", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "In-Game radar", Flag = "esp_radar", Default = true })
+end
+do
+    local P = Visuals:Panel(1)
+    P:Toggle({ Name = "Enable glow", Flag = "glow", Default = true, Keybind = Enum.KeyCode.G })
+    P:Sep()
+    P:Slider({ Name = "The power of brightness", Flag = "glow_power", Min = 0, Max = 100, Default = 50, Suffix = "%", Decimals = 0 })
+end
+do
+    local P = Visuals:Panel(1)
+    P:Toggle({ Name = "Attachments", Flag = "attach", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "Visible teammates", Flag = "teammates", Default = false, Keybind = Enum.KeyCode.V })
+end
+do
+    local P = Visuals:Panel(2)
+    P:Toggle({ Name = "Enable chams", Flag = "chams", Default = true, Keybind = Enum.KeyCode.H })
+    P:Sep()
+    P:Toggle({ Name = "Backtrack", Flag = "backtrack", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "On shot", Flag = "onshot", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "Ragdolls", Flag = "ragdolls", Default = false })
+end
+do
+    local P = Visuals:Panel(2)
+    P:Toggle({ Name = "Skeleton", Flag = "skeleton", Default = false })
+    P:Sep()
+    P:Dropdown({ Name = "Snaplines", Flag = "snaplines", Items = { "Top", "Bottom", "Left", "Right" }, Default = "Top" })
+    P:Sep()
+    P:Toggle({ Name = "Weapon", Flag = "weapon", Default = false })
+    P:Sep()
+    P:Toggle({ Name = "Nickname", Flag = "nickname", Default = false })
+end
+
+local Configs = Window:Page({ Name = "Configs", Columns = 2 })
+do
+    local P = Configs:Panel(1)
+    P:Dropdown({ Name = "Profile", Flag = "cfg_list", Items = { "default" }, Default = "default" })
+    P:Button({ Name = "Create config", Callback = function() UI:Notify("Config system ready", 2) end })
+    P:Button({ Name = "Load config", Callback = function() UI:Notify("Loaded", 2) end })
+    P:Button({ Name = "Save config", Callback = function() UI:Notify("Saved", 2) end })
+end
+
+local Settings = Window:Page({ Name = "Settings", Columns = 2 })
+do
+    local P = Settings:Panel(1)
+    P:Label({ Name = "Menu keybind: Insert" })
+    P:Sep()
+    P:Toggle({
+        Name = "Watermark",
+        Flag = "wm",
+        Default = true,
+        Callback = function(v)
+            Watermark:SetVisibility(v)
+        end,
+    })
+    P:Sep()
+    P:Button({ Name = "Notification test", Callback = function() UI:Notify("This is a notification", 4) end })
+    P:Sep()
+    P:Button({ Name = "Unload", Callback = function() UI:Unload() end })
+end
+
+UI:Notify(string.format("haze.best loaded · %.2fs", os.clock() - t0), 3)
+print("[haze.best] ready")

@@ -8,16 +8,33 @@ local TS = game:GetService("TweenService")
 local RS = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
-local function Hui()
-    return (gethui and gethui()) or game:GetService("CoreGui")
+local function ParentGui(gui)
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(gui)
+        end
+        if protect_gui then
+            protect_gui(gui)
+        end
+    end)
+    local ok = pcall(function()
+        if gethui then
+            gui.Parent = gethui()
+        else
+            gui.Parent = game:GetService("CoreGui")
+        end
+    end)
+    if not ok or not gui.Parent then
+        local pg = LocalPlayer:WaitForChild("PlayerGui", 5)
+        gui.Parent = pg
+    end
 end
 
 local Theme = {
-    Accent = Color3.fromHex("8e84ff"),
+    Accent = Color3.fromRGB(142, 132, 255),
     Shell = Color3.fromRGB(8, 8, 14),
     Content = Color3.fromRGB(12, 12, 18),
     Panel = Color3.fromRGB(16, 16, 24),
@@ -25,8 +42,8 @@ local Theme = {
     Element = Color3.fromRGB(21, 21, 29),
     ElementActive = Color3.fromRGB(37, 36, 53),
     KnobOff = Color3.fromRGB(41, 41, 53),
-    Text = Color3.fromRGB(49, 49, 61),
-    TextHov = Color3.fromRGB(104, 104, 120),
+    Text = Color3.fromRGB(104, 104, 120),
+    TextHov = Color3.fromRGB(160, 160, 176),
     TextActive = Color3.fromRGB(255, 255, 255),
     Border = Color3.fromRGB(40, 38, 58),
 }
@@ -42,7 +59,7 @@ local Library = {
 
 local function New(class, props)
     local i = Instance.new(class)
-    for k, v in props do
+    for k, v in pairs(props) do
         if k ~= "Parent" then
             i[k] = v
         end
@@ -114,14 +131,32 @@ end
 --------------------------------------------------------------------
 -- ScreenGui
 --------------------------------------------------------------------
+pcall(function()
+    local root = gethui and gethui() or game:GetService("CoreGui")
+    local old = root:FindFirstChild("haze_best_ui")
+    if old then
+        old:Destroy()
+    end
+end)
+pcall(function()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local old = pg:FindFirstChild("haze_best_ui")
+        if old then
+            old:Destroy()
+        end
+    end
+end)
+
 local Gui = New("ScreenGui", {
     Name = "haze_best_ui",
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    DisplayOrder = 100,
+    DisplayOrder = 999,
     IgnoreGuiInset = true,
-    Parent = Hui(),
 })
+ParentGui(Gui)
+print("[haze.ui] ScreenGui ->", Gui.Parent and Gui.Parent:GetFullName() or "nil")
 
 local Holder = New("Frame", {
     Name = "Holder",
@@ -276,7 +311,7 @@ function Library:Window(Opts)
             math.floor(Camera.ViewportSize.Y / 2 - H / 2)
         ),
         BackgroundColor3 = Theme.Shell,
-        BackgroundTransparency = 0.08,
+        BackgroundTransparency = 0.02,
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Parent = Holder,
