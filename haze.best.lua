@@ -3,8 +3,9 @@
 ]]
 
 local UI_URLS = {
+    "https://raw.githubusercontent.com/b5xv510nz66oi/library/16f3afa/haze.ui.lua",
+    "https://cdn.jsdelivr.net/gh/b5xv510nz66oi/library@16f3afa/haze.ui.lua",
     "https://raw.githubusercontent.com/b5xv510nz66oi/library/main/haze.ui.lua",
-    "https://cdn.jsdelivr.net/gh/b5xv510nz66oi/library@main/haze.ui.lua",
 }
 
 local function LoadUI()
@@ -143,11 +144,8 @@ end
 --------------------------------------------------------------------
 -- Move / Misc (empty like Tauri)
 --------------------------------------------------------------------
-local Move = Window:Page({ Name = "Move", Columns = 2 })
-Move:Panel(1):Label({ Name = " " })
-
-local Misc = Window:Page({ Name = "Misc", Columns = 2 })
-Misc:Panel(1):Label({ Name = " " })
+Window:Page({ Name = "Move", Columns = 2 })
+Window:Page({ Name = "Misc", Columns = 2 })
 
 --------------------------------------------------------------------
 -- Visuals
